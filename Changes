@@ -1,4 +1,9 @@
 ---
+version: 0.02
+date:    Sun Oct 21 17:33:58 PDT 2012
+changes:
+- Add features list to docs. sevvie++
+---
 version: 0.01
 date:    Sun Oct 21 17:08:57 PDT 2012
 changes:

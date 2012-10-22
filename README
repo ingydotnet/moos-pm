@@ -25,6 +25,30 @@ DESCRIPTION
     does). It is fairly minimal; it supports the features shown in the
     SYNOPSIS.
 
+FEATURES
+    Here's a quick list of the Moose features that are supported by Moos:
+
+    extends($class);
+        For inheritance. "Moos::Object" is the default base class.
+
+    $class->new(key => $value, key2 => $value)
+        A constructor.
+
+    sub BUILD { ... }
+        Custom object construction.
+
+    has name => ( ...options... );
+        Accessor generator.
+
+    has name => ( default => sub { ... } );
+        Specify the sub to generate a default value.
+
+    has name => ( buillder => 'buiild_method_name' );
+        Specify the method name to generate a default value.
+
+    has name => (..., lazy => 1);
+        Don't generate defaults during object construction.
+
 DEV OPTIONS
     Moos has a couple builtin dev options. They are controlled by
     environment variables.

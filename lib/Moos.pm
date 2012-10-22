@@ -17,7 +17,7 @@ use warnings;
 
 package Moos;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 sub import {
     my $caller = caller;
@@ -146,6 +146,42 @@ sub BUILD {
 Moos completes the M to Moose sequence of Perl OO modules. This one is pure
 Perl, no dependencies, single file, Moose compatible (for what it does). It is
 fairly minimal; it supports the features shown in the L<SYNOPSIS>.
+
+=head1 FEATURES
+
+Here's a quick list of the L<Moose> features that are supported by L<Moos>:
+
+=over
+
+=item extends($class);
+
+For inheritance. C<Moos::Object> is the default base class.
+
+=item $class->new(key => $value, key2 => $value)
+
+A constructor.
+
+=item sub BUILD { ... }
+
+Custom object construction.
+
+=item has name => ( ...options... );
+
+Accessor generator.
+
+=item has name => ( default => sub { ... } );
+
+Specify the sub to generate a default value.
+
+=item has name => ( buillder => 'buiild_method_name' );
+
+Specify the method name to generate a default value.
+
+=item has name => (..., lazy => 1);
+
+Don't generate defaults during object construction.
+
+=back
 
 =head1 DEV OPTIONS
 
