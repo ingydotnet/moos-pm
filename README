@@ -5,7 +5,7 @@ SYNOPSIS
         package Foos;
         use Moos;
 
-        extends 'Bars';
+        extends 'Boos';
 
         has this => ();
         has that => (default => sub { 42 });
@@ -20,34 +20,55 @@ SYNOPSIS
         }
 
 DESCRIPTION
-    Moos completes the M to Moose sequence of Perl OO modules. This one is
-    pure Perl, no dependencies, single file, Moose compatible (for what it
-    does). It is fairly minimal; it supports the features shown in the
-    SYNOPSIS.
+    Moos completes the M to Moose sequence of Perl OO modules.
+
+    This one is pure Perl, no dependencies, single file and Moose compatible
+    (for what it does). It is fairly minimal; it supports the features shown
+    in the SYNOPSIS.
 
 FEATURES
-    Here's a quick list of the Moose features that are supported by Moos:
+    Here's a quick list of the Moose compatible features that are supported
+    by Moos:
 
-    extends($class);
+    extends
         For inheritance. "Moos::Object" is the default base class.
 
-    $class->new(key => $value, key2 => $value)
-        A constructor.
+            package MyClass;
+            extends 'MyBaseClass';
 
-    sub BUILD { ... }
-        Custom object construction.
+    new A constructor class method.
 
-    has name => ( ...options... );
-        Accessor generator.
+            my $object = MyClass->new(this => 'nice', that => 2);
 
-    has name => ( default => sub { ... } );
+    BUILD
+        Custom object construction. If you define BUILD, it is passed the
+        value of the new object during construction. You can modify the
+        object. Any value you return is ignored.
+
+            sub BUILD { my $self = shift; ... }
+
+    has Accessor generator. Supports the "default", "build" and "lazy"
+        options, described below.
+
+            has this => ();
+
+    default
         Specify the sub to generate a default value.
 
-    has name => ( buillder => 'buiild_method_name' );
+            has this => ( default => sub { 42 } );
+
+    builder
         Specify the method name to generate a default value.
 
-    has name => (..., lazy => 1);
+            has this => ( builder => 'build_this' );
+
+    lazy
         Don't generate defaults during object construction.
+
+            has this => ( builder => 'build_this', lazy => 1 );
+
+    Note that currently all accessors are read-write, and the "is" keyword
+    is silently ignored (as are all other unknown keywords).
 
 DEV OPTIONS
     Moos has a couple builtin dev options. They are controlled by
@@ -79,7 +100,7 @@ ON SPEED
     In the end, I got Pegex to run even faster with Moos than it originally
     did with Mouse. I'll tell you my secret...
 
-        Accessors (usually) do not need to be method calls.
+    <Accessors *(usually)* do not need to be method calls.>
 
     Replace these:
 

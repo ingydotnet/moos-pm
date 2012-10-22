@@ -17,7 +17,7 @@ use warnings;
 
 package Moos;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 sub import {
     my $caller = caller;
@@ -127,7 +127,7 @@ sub BUILD {
     package Foos;
     use Moos;
 
-    extends 'Bars';
+    extends 'Boos';
 
     has this => ();
     has that => (default => sub { 42 });
@@ -143,45 +143,69 @@ sub BUILD {
 
 =head1 DESCRIPTION
 
-Moos completes the M to Moose sequence of Perl OO modules. This one is pure
-Perl, no dependencies, single file, Moose compatible (for what it does). It is
-fairly minimal; it supports the features shown in the L<SYNOPSIS>.
+Moos completes the M to Moose sequence of Perl OO modules.
+
+This one is pure Perl, no dependencies, single file and Moose compatible (for
+what it does). It is fairly minimal; it supports the features shown in the
+L<SYNOPSIS>.
 
 =head1 FEATURES
 
-Here's a quick list of the L<Moose> features that are supported by L<Moos>:
+Here's a quick list of the L<Moose> compatible features that are supported by
+L<Moos>:
 
 =over
 
-=item extends($class);
+=item extends
 
 For inheritance. C<Moos::Object> is the default base class.
 
-=item $class->new(key => $value, key2 => $value)
+    package MyClass;
+    extends 'MyBaseClass';
 
-A constructor.
+=item new
 
-=item sub BUILD { ... }
+A constructor class method.
 
-Custom object construction.
+    my $object = MyClass->new(this => 'nice', that => 2);
 
-=item has name => ( ...options... );
+=item BUILD
 
-Accessor generator.
+Custom object construction. If you define BUILD, it is passed the value of the
+new object during construction. You can modify the object. Any value you
+return is ignored.
 
-=item has name => ( default => sub { ... } );
+    sub BUILD { my $self = shift; ... }
+
+=item has
+
+Accessor generator. Supports the C<default>, C<build> and C<lazy> options,
+described below.
+
+    has this => ();
+
+=item default
 
 Specify the sub to generate a default value.
 
-=item has name => ( buillder => 'buiild_method_name' );
+    has this => ( default => sub { 42 } );
+
+=item builder
 
 Specify the method name to generate a default value.
 
-=item has name => (..., lazy => 1);
+    has this => ( builder => 'build_this' );
+
+=item lazy
 
 Don't generate defaults during object construction.
 
+    has this => ( builder => 'build_this', lazy => 1 );
+
 =back
+
+Note that currently all accessors are read-write, and the C<is> keyword is
+silently ignored (as are all other unknown keywords).
 
 =head1 DEV OPTIONS
 
@@ -222,7 +246,7 @@ I've shared Pegex::Base as L<Moos> in case any other projects want it.
 In the end, I got Pegex to run even faster with Moos than it originally did
 with Mouse. I'll tell you my secret...
 
-    Accessors (usually) do not need to be method calls.
+B<<Accessors I<(usually)> do not need to be method calls.>>
 
 Replace these:
 

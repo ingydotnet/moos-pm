@@ -1,4 +1,9 @@
 ---
+version: 0.03
+date:    Sun Oct 21 23:36:33 PDT 2012
+changes:
+- Add more to docs. lukec++
+---
 version: 0.02
 date:    Sun Oct 21 17:33:58 PDT 2012
 changes:
