@@ -49,4 +49,11 @@ isnt $bar->{array}, $Bar::array;
 is ref($bar->{lol}), 'ARRAY';
 is $bar->{lol}[0], $Bar::array;
 
+ok eval q{{
+	package Fooble;
+	use Moos;
+	__PACKAGE__->can('confess') and __PACKAGE__->can('blessed');
+	blessed(Fooble->new);
+}};
+
 done_testing;
