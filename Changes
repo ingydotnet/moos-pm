@@ -1,4 +1,10 @@
 ---
+version: 0.04
+date:    Thu Oct 25 01:29:09 PDT 2012
+changes:
+- Rewrite based more closely on Moose implementation. doy++ helped me figure
+  things out.
+---
 version: 0.03
 date:    Sun Oct 21 23:36:33 PDT 2012
 changes:
