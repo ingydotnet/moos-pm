@@ -8,7 +8,7 @@ SYNOPSIS
         extends 'Boos';
 
         has this => ();
-        has that => (default => sub { 42 });
+        has that => 42;
         has other => (
             builder => 'build_other',
             lazy => 1,
@@ -19,16 +19,24 @@ SYNOPSIS
             # build, build, build
         }
 
+        sub BUILDARGS {
+            my ($self, @args) = @_;
+            # munge, munge, munge
+            return {%munged_args};
+        }
+
 DESCRIPTION
     Moos completes the M to Moose sequence of Perl OO modules.
 
     This one is pure Perl, no dependencies, single file and Moose compatible
-    (for what it does). It is fairly minimal; it supports the features shown
-    in the SYNOPSIS.
+    (for what it does). It is fairly minimal.
 
 FEATURES
     Here's a quick list of the Moose compatible features that are supported
     by Moos:
+
+    strict / warnings
+        Turns on "strict" and "warnings" for you.
 
     extends
         For inheritance. "Moos::Object" is the default base class.
@@ -47,10 +55,21 @@ FEATURES
 
             sub BUILD { my $self = shift; ... }
 
-    has Accessor generator. Supports the "default", "build" and "lazy"
-        options, described below.
+    Helpful exports
+        The ever useful "blessed" (from Scalar::Util) and "confess" (from
+        Carp) are exported to your namespace.
+
+    has Accessor generator. Supports the "is", "default", "build", "lazy",
+        "clearer", "predicate", "required" and "handles" options, described
+        below.
 
             has this => ();
+
+    is  Specify which type of attribute accessor to provide. The default is
+        "rw", a read-write accessor. Read-only "ro" accessors are also
+        supported.
+
+            has this => ( is => "ro" );
 
     default
         Specify the sub to generate a default value.
@@ -60,28 +79,56 @@ FEATURES
     builder
         Specify the method name to generate a default value.
 
-            has this => ( builder => 'build_this' );
+            has this => ( builder => '_build_this' );
+            has that => ( builder => 1 );  # accept default name for method
 
     lazy
         Don't generate defaults during object construction.
 
-            has this => ( builder => 'build_this', lazy => 1 );
+            has this => ( builder => '_build_this', lazy => 1 );
 
-    Note that currently all accessors are read-write, and the "is" keyword
-    is silently ignored (as are all other unknown keywords).
+    clearer
+        Creates a clearer method.
+
+            has this => ( clearer => "clear_this" );
+            has that => ( clearer => 1 );  # accept default name for method
+
+    predicate
+        Creates a predicate method, which can be used to check if the
+        attribute is set or unset.
+
+            has this => ( predicate => "has_this" );
+            has that => ( predicate => 1 );  # accept default name for method
+
+    required
+        Require that a value for the attribute be provided to the
+        constructor or generated during object construction.
+
+            has this => ( required => 1 );
+
+    handles
+        Delegated method calls.
+
+            has wheels => (handles => [qw/ roll /]);
+
+        This accepts a hashref or arrayref, but not the other possibilities
+        offered by Moose.
+
+    Note that currently all accessors are read-write by default and all
+    unknown options are silently ignored.
 
 HAS DIFFERENCES
     Moos has a few differences from Moose, regarding it's accessor support
     (ie the 'has' function).
 
-    Support for "default", "builder" and "lazy" are about the same. All
-    other arguments are currently ignored, including the "is" property. All
-    generated accessors are 'rw'. So you can just say:
+    The supported options detailed above are about the same as Moose. All
+    other arguments are currently ignored. All generated accessors are 'rw'.
+    So you can just say:
 
         has 'this';
         has that => ();
 
-    Unlike the other Mo* modules, Moos also supports just sepcifiying the
+    Unlike the other Mo* modules, Moos also supports just specifying the
     default. If the number of arguments (after the name) is an odd number,
     then the first value is the default. The following forms are valid:
 
@@ -119,6 +166,8 @@ WHENCE
     I tried to inline Moo into one file but failed, and ended up with this.
     I've shared Pegex::Base as Moos in case any other projects want it.
 
+    Later on, Toby added a bunch of low-cost but very features from Moose.
+
 ON SPEED
     In the end, I got Pegex to run even faster with Moos than it originally
     did with Mouse. I'll tell you my secret...
@@ -150,6 +199,10 @@ ON SPEED
 
     I'm sure I've missed some subtlties, and would be glad to hear opinions,
     but in the meantime I'm happy that my code is faster and pure Perl.
+
+CREDITS
+    Toby Inkster <tobyink@cpan.org> submitted a number of great pull
+    requests, making Moos a little bit more like Moose.
 
 SEE ALSO
     *   M
