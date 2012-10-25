@@ -334,6 +334,13 @@ described below.
 
     has this => ();
 
+=item is
+
+Specify which type of attribute accessor to provide. The default is "rw",
+a read-write accessor. Read-only "ro" accessors are also supported.
+
+    has this => ( is => "ro" );
+
 =item default
 
 Specify the sub to generate a default value.
