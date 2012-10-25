@@ -22,6 +22,7 @@ package Moos;
 use v5.10.0;
 use mro;
 use Scalar::Util;
+use Carp qw(confess);
 
 our $VERSION = '0.05';
 
@@ -42,6 +43,10 @@ sub import {
     # Export the 'has' and 'extends' helper functions
     _export($package, has => \&has, $meta);
     _export($package, extends => \&extends, $meta);
+
+    # Export the 'blessed' and 'confess' functions
+    _export($package, blessed => \&Scalar::Util::blessed);
+    _export($package, confess => \&Carp::confess);
 
     # Possibly export some handy debugging stuff
     _export_xxx($package) if $ENV{PERL_MOOS_XXX};
