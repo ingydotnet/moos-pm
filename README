@@ -70,6 +70,29 @@ FEATURES
     Note that currently all accessors are read-write, and the "is" keyword
     is silently ignored (as are all other unknown keywords).
 
+HAS DIFFERENCES
+    Moos has a few differences from Moose, regarding it's accessor support
+    (ie the 'has' function).
+
+    Support for "default", "builder" and "lazy" are about the same. All
+    other arguments are currently ignored, including the "is" property. All
+    generated accessors are 'rw'. So you can just say:
+
+        has 'this';
+        has that => ();
+
+    Unlike the other Mo* modules, Moos also supports just sepcifiying the
+    default. If the number of arguments (after the name) is an odd number,
+    then the first value is the default. The following forms are valid:
+
+        has a => 42;
+        has b => 'string' => (lazy => 1);
+        has c => {};
+        has d => [1, 2, 3, 4];
+
+    These all result in creating a Moos "default" argument. If the default
+    is an array or hash reference, a shallow copy is made.
+
 DEV OPTIONS
     Moos has a couple builtin dev options. They are controlled by
     environment variables.

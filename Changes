@@ -1,4 +1,11 @@
 ---
+version: 0.05
+date:    Thu Oct 25 12:44:58 PDT 2012
+changes:
+- Use Scalar::Util::blessed instead of ref
+- Support: has foo => 42;
+- Update docs.
+---
 version: 0.04
 date:    Thu Oct 25 01:29:09 PDT 2012
 changes:

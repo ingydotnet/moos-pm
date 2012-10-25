@@ -13,16 +13,17 @@
 # - Mouse
 # - Mousse
 
-# The entire implementation of Moos (and all its related classes) are defined
-# inside this one file.
+# The entire implementation of Moos (and all its related classes)
+# are defined inside this one file.
 use strict;
 use warnings;
 
 package Moos;
 use v5.10.0;
 use mro;
+use Scalar::Util;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 sub import {
     # Get name of the "class" from whence "use Moos;"
@@ -48,7 +49,20 @@ sub import {
 
 # Attribute generator
 sub has {
-    my ($meta, $name, %args) = @_;
+    my ($meta, $name) = splice(@_, 0, 2);
+    my %args;
+
+    # Support 2-arg shorthand: 
+    #     has foo => 42;
+    if (@_ % 2) {
+        my $default = shift;
+        my $sub = 
+            ref($default) eq 'HASH' ? sub {+{%$default}} :
+            ref($default) eq 'ARRAY' ? sub {[@$default]} :
+            sub {$default};
+        %args = (default => $sub);
+    }
+    %args = (%args, @_);
 
     # Add attribute to meta class object
     $meta->add_attribute($name => %args);
@@ -63,12 +77,11 @@ sub has {
         } :
         $default ? sub {
             $#_ ? $_[0]{$name} = $_[1] :
-            exists($_[0]{$name}) ?  $_[0]{$name} :
-            ($_[0]{$name} = $default->(@_));
+            exists($_[0]{$name}) ? $_[0]{$name} :
+            ($_[0]{$name} = $default->($_[0]));
         } :
         sub {
-            $#_ ? $_[0]{$name} = $_[1] :
-            $_[0]{$name};
+            $#_ ? $_[0]{$name} = $_[1] : $_[0]{$name};
         };
 
     # Dev debug thing to trace calls to accessor subs.
@@ -214,7 +227,7 @@ package Moos::Object;
 
 sub new {
     my $class = shift;
-    my $real_class = ref($class) || $class;
+    my $real_class = Scalar::Util::blessed($class) || $class;
     my $params = $real_class->BUILDARGS(@_);
     return Moos::Meta::Class->initialize($real_class)->new_object($params);
 }
@@ -226,7 +239,9 @@ sub BUILDARGS {
 sub BUILDALL {
     return unless $_[0]->can('BUILD');
     my ($self, $params) = @_;
-    for my $package (reverse @{mro::get_linear_isa(ref($self))}) {
+    for my $package (
+        reverse @{mro::get_linear_isa(Scalar::Util::blessed($self))}
+    ) {
         no strict 'refs';
         if (defined &{"$package\::BUILD"}) {
             &{"$package\::BUILD"}($self, $params);
@@ -243,7 +258,7 @@ sub dump {
 }
 
 sub meta {
-    Moos::MOP::Class->initialize(ref($_[0]) || $_[0]);
+    Moos::MOP::Class->initialize(Scalar::Util::blessed($_[0]) || $_[0]);
 }
 
 1;
@@ -332,6 +347,30 @@ Don't generate defaults during object construction.
 
 Note that currently all accessors are read-write, and the C<is> keyword is
 silently ignored (as are all other unknown keywords).
+
+=head1 HAS DIFFERENCES
+
+Moos has a few differences from Moose, regarding it's accessor support (ie the
+'has' function).
+
+Support for C<default>, C<builder> and C<lazy> are about the same. All other
+arguments are currently ignored, including the C<is> property. All generated
+accessors are 'rw'. So you can just say:
+
+    has 'this';
+    has that => ();
+
+Unlike the other Mo* modules, Moos also supports just sepcifiying the default.
+If the number of arguments (after the name) is an odd number, then the first
+value is the default. The following forms are valid:
+
+    has a => 42;
+    has b => 'string' => (lazy => 1);
+    has c => {};
+    has d => [1, 2, 3, 4];
+
+These all result in creating a Moos C<default> argument. If the default is an
+array or hash reference, a shallow copy is made.
 
 =head1 DEV OPTIONS
 
