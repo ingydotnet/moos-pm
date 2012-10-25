@@ -91,6 +91,14 @@ sub has {
             $#_ ? $_[0]{$name} = $_[1] : $_[0]{$name};
         };
 
+    if (exists $args{is} and $args{is} eq 'ro') {
+        my $orig = $accessor;
+        $accessor = sub {
+            confess "cannot set value for read-only accessor '$name'" if @_ > 1;
+            goto $orig;
+        };
+    }
+
     # Dev debug thing to trace calls to accessor subs.
     $accessor = _trace_accessor_calls($name, $accessor)
         if $ENV{PERL_MOOS_ACCESSOR_CALLS};
@@ -357,6 +365,13 @@ Accessor generator. Supports the C<default>, C<build> and C<lazy> options,
 described below.
 
     has this => ();
+
+=item is
+
+Specify which type of attribute accessor to provide. The default is "rw",
+a read-write accessor. Read-only "ro" accessors are also supported.
+
+    has this => ( is => "ro" );
 
 =item default
 
