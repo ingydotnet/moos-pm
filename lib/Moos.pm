@@ -90,6 +90,19 @@ sub has {
 
     # Export the accessor.
     _export($meta->{package}, $name, $accessor);
+    
+    # Delegated methods
+    if (exists $args{handles}) {
+        my %map;
+        %map = %{$args{handles}}
+            if Scalar::Util::reftype($args{handles}) eq 'HASH';
+        %map = map { ;$_=>$_ } @{$args{handles}}
+            if Scalar::Util::reftype($args{handles}) eq 'ARRAY';
+        while (my ($local, $remote) = each %map) {
+            my $sub = sub { shift->{$name}->$remote(@_) };
+            _export($meta->{package}, $local, $sub);
+        }
+    }
 }
 
 # Inheritance maker
@@ -342,6 +355,15 @@ Specify the method name to generate a default value.
 Don't generate defaults during object construction.
 
     has this => ( builder => 'build_this', lazy => 1 );
+
+=item handles
+
+Delegated method calls.
+
+    has wheels => (handles => [qw/ roll /]);
+
+This accepts a hashref or arrayref, but not the other possibilities
+offered by Moose.
 
 =back
 
