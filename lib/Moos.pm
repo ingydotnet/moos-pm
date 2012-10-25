@@ -22,6 +22,7 @@ package Moos;
 use v5.10.0;
 use mro;
 use Scalar::Util;
+use Carp qw(confess);
 
 our $VERSION = '0.05';
 
@@ -42,6 +43,10 @@ sub import {
     # Export the 'has' and 'extends' helper functions
     _export($package, has => \&has, $meta);
     _export($package, extends => \&extends, $meta);
+
+    # Export the 'blessed' and 'confess' functions
+    _export($package, blessed => \&Scalar::Util::blessed);
+    _export($package, confess => \&Carp::confess);
 
     # Possibly export some handy debugging stuff
     _export_xxx($package) if $ENV{PERL_MOOS_XXX};
@@ -358,6 +363,9 @@ generated during object construction.
 
 Note that currently all accessors are read-write, and the C<is> keyword is
 silently ignored (as are all other unknown keywords).
+
+The eternally useful C<blessed> (from L<Scalar::Util>) and C<confess>
+(from L<Carp>) are also exported to your namespace.
 
 =head1 HAS DIFFERENCES
 
