@@ -22,6 +22,7 @@ package Moos;
 use v5.10.0;
 use mro;
 use Scalar::Util;
+use Carp qw(confess);
 
 our $VERSION = '0.05';
 
@@ -83,6 +84,14 @@ sub has {
         sub {
             $#_ ? $_[0]{$name} = $_[1] : $_[0]{$name};
         };
+
+    if (exists $args{is} and $args{is} eq 'ro') {
+        my $orig = $accessor;
+        $accessor = sub {
+            confess "cannot set value for read-only accessor '$name'" if @_ > 1;
+            goto $orig;
+        };
+    }
 
     # Dev debug thing to trace calls to accessor subs.
     $accessor = _trace_accessor_calls($name, $accessor)
