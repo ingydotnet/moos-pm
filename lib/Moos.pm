@@ -74,6 +74,8 @@ sub has {
 
     # Make a Setter/Getter accessor
     my ($builder, $default) = @args{qw(builder default)};
+    $builder = "_build_$name"
+        if defined $builder && $builder eq "1";
     my $accessor =
         $builder ? sub {
             $#_ ? $_[0]{$name} = $_[1] :
@@ -95,6 +97,26 @@ sub has {
 
     # Export the accessor.
     _export($meta->{package}, $name, $accessor);
+
+    # Clearer
+    if (exists $args{clearer})
+    {
+        my $clearer = $args{clearer};
+        $clearer = $name =~ /^_/ ? "_clear$name" : "clear_$name"
+            if $clearer eq "1";
+        my $sub = sub { delete $_[0]{$name} };
+        _export($meta->{package}, $clearer, $sub);
+    }
+
+    # Predicate
+    if (exists $args{predicate})
+    {
+        my $predicate = $args{predicate};
+        $predicate = $name =~ /^_/ ? "_has$name" : "has_$name"
+            if $predicate eq "1";
+        my $sub = sub { exists $_[0]{$name} };
+        _export($meta->{package}, $predicate, $sub);
+    }
 }
 
 # Inheritance maker
@@ -204,6 +226,8 @@ sub _construct_instance {
         }
         if (not $attr->{lazy}) {
             if (my $builder = $attr->{builder}) {
+                $builder = "_build_$name"
+                    if defined $builder && $builder eq "1";
                 $instance->{$name} = $instance->$builder();
                 next;
             }
@@ -344,13 +368,29 @@ Specify the sub to generate a default value.
 
 Specify the method name to generate a default value.
 
-    has this => ( builder => 'build_this' );
+    has this => ( builder => '_build_this' );
+    has that => ( builder => 1 );  # accept default name for method
 
 =item lazy
 
 Don't generate defaults during object construction.
 
-    has this => ( builder => 'build_this', lazy => 1 );
+    has this => ( builder => '_build_this', lazy => 1 );
+
+=item clearer
+
+Creates a clearer method.
+
+    has this => ( clearer => "clear_this" );
+    has that => ( clearer => 1 );  # accept default name for method
+
+=item predicate
+
+Creates a predicate method, which can be used to check if the attribute is
+set or unset.
+
+    has this => ( predicate => "has_this" );
+    has that => ( predicate => 1 );  # accept default name for method
 
 =item required
 
