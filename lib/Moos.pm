@@ -148,6 +148,7 @@ sub _trace_accessor_calls {
 # The remainder of this module was heavily inspired by Moose, and tried to do
 # what Moose does, only much less.
 package Moos::Meta::Class;
+use Carp qw(confess);
 
 my $meta_class_objects = {};
 
@@ -203,6 +204,9 @@ sub _construct_instance {
             }
             elsif (my $default = $attr->{default}) {
                 $instance->{$name} = $default->($instance);
+            }
+            if ($attr->{required} and not exists $instance->{$name}) {
+                confess "missing required attribute '$name'";
             }
         }
     }
