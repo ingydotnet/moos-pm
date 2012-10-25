@@ -347,6 +347,13 @@ Don't generate defaults during object construction.
 
     has this => ( builder => 'build_this', lazy => 1 );
 
+=item required
+
+Require that a value for the attribute be provided to the constructor or
+generated during object construction.
+
+    has this => ( required => 1 );
+
 =back
 
 Note that currently all accessors are read-write, and the C<is> keyword is
