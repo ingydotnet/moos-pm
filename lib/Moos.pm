@@ -359,13 +359,29 @@ Specify the sub to generate a default value.
 
 Specify the method name to generate a default value.
 
-    has this => ( builder => 'build_this' );
+    has this => ( builder => '_build_this' );
+    has that => ( builder => 1 );  # accept default name for method
 
 =item lazy
 
 Don't generate defaults during object construction.
 
-    has this => ( builder => 'build_this', lazy => 1 );
+    has this => ( builder => '_build_this', lazy => 1 );
+
+=item clearer
+
+Creates a clearer method.
+
+    has this => ( clearer => "clear_this" );
+    has that => ( clearer => 1 );  # accept default name for method
+
+=item predicate
+
+Creates a predicate method, which can be used to check if the attribute is
+set or unset.
+
+    has this => ( predicate => "has_this" );
+    has that => ( predicate => 1 );  # accept default name for method
 
 =back
 
