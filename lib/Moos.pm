@@ -107,8 +107,7 @@ sub has {
     _export($meta->{package}, $name, $accessor);
 
     # Clearer
-    if (exists $args{clearer})
-    {
+    if (exists $args{clearer}) {
         my $clearer = $args{clearer};
         $clearer = $name =~ /^_/ ? "_clear$name" : "clear_$name"
             if $clearer eq "1";
@@ -117,13 +116,25 @@ sub has {
     }
 
     # Predicate
-    if (exists $args{predicate})
-    {
+    if (exists $args{predicate}) {
         my $predicate = $args{predicate};
         $predicate = $name =~ /^_/ ? "_has$name" : "has_$name"
             if $predicate eq "1";
         my $sub = sub { exists $_[0]{$name} };
         _export($meta->{package}, $predicate, $sub);
+    }
+
+    # Delegated methods
+    if (exists $args{handles}) {
+        my %map;
+        %map = %{$args{handles}}
+            if Scalar::Util::reftype($args{handles}) eq 'HASH';
+        %map = map { ;$_=>$_ } @{$args{handles}}
+            if Scalar::Util::reftype($args{handles}) eq 'ARRAY';
+        while (my ($local, $remote) = each %map) {
+            my $sub = sub { shift->{$name}->$remote(@_) };
+            _export($meta->{package}, $local, $sub);
+        }
     }
 }
 
@@ -413,6 +424,15 @@ Require that a value for the attribute be provided to the constructor or
 generated during object construction.
 
     has this => ( required => 1 );
+
+=item handles
+
+Delegated method calls.
+
+    has wheels => (handles => [qw/ roll /]);
+
+This accepts a hashref or arrayref, but not the other possibilities
+offered by Moose.
 
 =back
 
