@@ -353,6 +353,9 @@ Don't generate defaults during object construction.
 Note that currently all accessors are read-write, and the C<is> keyword is
 silently ignored (as are all other unknown keywords).
 
+The eternally useful C<blessed> (from L<Scalar::Util>) and C<confess>
+(from L<Carp>) are also exported to your namespace.
+
 =head1 HAS DIFFERENCES
 
 Moos has a few differences from Moose, regarding it's accessor support (ie the
