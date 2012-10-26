@@ -70,12 +70,79 @@ sub has {
     %args = (%args, @_);
 
     # Add attribute to meta class object
-    $meta->add_attribute($name => %args);
+    $meta->add_attribute($name => \%args);
+}
+
+# Inheritance maker
+sub extends {
+    my ($meta, @parent) = @_;
+    eval "require $_" for @parent;
+    $meta->superclasses(@parent);
+}
+
+# Use this for exports and meta-exports
+sub _export {
+    my ($package, $name, $code, $meta) = @_;
+    if (defined $meta) {
+        my $orig = $code;
+        $code = sub {
+            unshift @_, $meta;
+            goto &$orig;
+        };
+    }
+    no strict 'refs';
+    *{"$package\::$name"} = $code;
+}
+
+# Export the 4 debugging subs from XXX.pm
+sub _export_xxx {
+    my ($package) = @_;
+    eval "use XXX -with => 'YAML::XS'; 1" or die $@;
+    no strict 'refs';
+    _export($package, WWW => \&{__PACKAGE__ . '::WWW'});
+    _export($package, XXX => \&{__PACKAGE__ . '::XXX'});
+    _export($package, YYY => \&{__PACKAGE__ . '::YYY'});
+    _export($package, ZZZ => \&{__PACKAGE__ . '::ZZZ'});
+}
+
+# The remainder of this module was heavily inspired by Moose, and tried to do
+# what Moose does, only much less.
+package Moos::Meta::Class;
+use Carp qw(confess);
+
+my $meta_class_objects = {};
+
+sub name { $_[0]->{package} }
+
+sub initialize {
+    my ($class, $package) = @_;
+
+    return $meta_class_objects->{$package} //= do {
+        bless {
+            package => $package,
+            attributes => {},
+            _attributes => [],
+        }, $class;
+    };
+}
+
+# Make a new attrribute object and add it to both a hash and an array, so that
+# we can preserve the order defined.
+sub add_attribute {
+    my $self = shift;
+    my $name = shift;
+    my %args = @_==1 ? %{$_[0]} : @_;
+
+    # Massage %args
+    $args{builder} = "_build_$name"
+        if defined $args{builder} && $args{builder} eq "1";
+    $args{clearer} = $name =~ /^_/ ? "_clear$name" : "clear_$name"
+        if defined $args{clearer} && $args{clearer} eq "1";
+    $args{predicate} = $name =~ /^_/ ? "_has$name" : "has_$name"
+        if defined $args{predicate} && $args{predicate} eq "1";
 
     # Make a Setter/Getter accessor
     my ($builder, $default) = @args{qw(builder default)};
-    $builder = "_build_$name"
-        if defined $builder && $builder eq "1";
     my $accessor =
         $builder ? sub {
             $#_ ? $_[0]{$name} = $_[1] :
@@ -104,24 +171,20 @@ sub has {
         if $ENV{PERL_MOOS_ACCESSOR_CALLS};
 
     # Export the accessor.
-    _export($meta->{package}, $name, $accessor);
+    Moos::_export($self->{package}, $name, $accessor);
 
     # Clearer
     if (exists $args{clearer}) {
         my $clearer = $args{clearer};
-        $clearer = $name =~ /^_/ ? "_clear$name" : "clear_$name"
-            if $clearer eq "1";
         my $sub = sub { delete $_[0]{$name} };
-        _export($meta->{package}, $clearer, $sub);
+        Moos::_export($self->{package}, $clearer, $sub);
     }
 
     # Predicate
     if (exists $args{predicate}) {
         my $predicate = $args{predicate};
-        $predicate = $name =~ /^_/ ? "_has$name" : "has_$name"
-            if $predicate eq "1";
         my $sub = sub { exists $_[0]{$name} };
-        _export($meta->{package}, $predicate, $sub);
+        Moos::_export($self->{package}, $predicate, $sub);
     }
 
     # Delegated methods
@@ -133,42 +196,17 @@ sub has {
             if Scalar::Util::reftype($args{handles}) eq 'ARRAY';
         while (my ($local, $remote) = each %map) {
             my $sub = sub { shift->{$name}->$remote(@_) };
-            _export($meta->{package}, $local, $sub);
+            Moos::_export($self->{package}, $local, $sub);
         }
     }
-}
 
-# Inheritance maker
-sub extends {
-    my ($meta, $parent) = @_;
-    eval "require $parent";
-    no strict 'refs';
-    @{"$meta->{package}\::ISA"} = ($parent);
-}
-
-# Use this for exports and meta-exports
-sub _export {
-    my ($package, $name, $code, $meta) = @_;
-    if (defined $meta) {
-        my $orig = $code;
-        $code = sub {
-            unshift @_, $meta;
-            goto &$orig;
-        };
-    }
-    no strict 'refs';
-    *{"$package\::$name"} = $code;
-}
-
-# Export the 4 debugging subs from XXX.pm
-sub _export_xxx {
-    my ($package) = @_;
-    eval "use XXX -with => 'YAML::XS'; 1" or die $@;
-    no strict 'refs';
-    _export($package, WWW => \&{__PACKAGE__ . '::WWW'});
-    _export($package, XXX => \&{__PACKAGE__ . '::XXX'});
-    _export($package, YYY => \&{__PACKAGE__ . '::YYY'});
-    _export($package, ZZZ => \&{__PACKAGE__ . '::ZZZ'});
+    push @{$self->{_attributes}}, (
+        $self->{attributes}{$name} =
+            bless {
+                name => $name,
+                %args,
+            }, 'Moos::Meta::Attribute'
+    );
 }
 
 # A tracing wrapper for debugging accessors
@@ -191,39 +229,13 @@ sub _trace_accessor_calls {
     };
 }
 
-# The remainder of this module was heavily inspired by Moose, and tried to do
-# what Moose does, only much less.
-package Moos::Meta::Class;
-use Carp qw(confess);
-
-my $meta_class_objects = {};
-
-sub name { $_[0]->{package} }
-
-sub initialize {
-    my ($class, $package) = @_;
-
-    return $meta_class_objects->{$package} //= do {
-        bless {
-            package => $package,
-            attributes => {},
-            _attributes => [],
-        }, $class;
-    };
-}
-
-# Make a new attrribute object and add it to both a hash and an array, so that
-# we can preserve the order defined.
-sub add_attribute {
-    my $self = shift;
-    my ($name, %args) = @_;
-    push @{$self->{_attributes}}, (
-        $self->{attributes}{$name} =
-            bless {
-                name => $name,
-                %args,
-            }, 'Moos::Meta::Attribute'
-    );
+sub superclasses {
+    no strict 'refs';
+    my ($self, @supers) = @_;
+    if (@supers) {
+        @{"$self->{package}\::ISA"} = @supers;
+    }
+    return @{"$self->{package}\::ISA"};
 }
 
 sub new_object {
