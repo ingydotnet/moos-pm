@@ -110,6 +110,8 @@ sub _export_xxx {
 package Moos::Meta::Class;
 use Carp qw(confess);
 
+our @ISA = 'Moos::Object';
+
 my $meta_class_objects = {};
 
 sub name { $_[0]->{package} }
@@ -203,7 +205,8 @@ sub add_attribute {
     push @{$self->{_attributes}}, (
         $self->{attributes}{$name} =
             bless {
-                name => $name,
+                name             => $name,
+                associated_class => $self,
                 %args,
             }, 'Moos::Meta::Attribute'
     );
@@ -287,6 +290,30 @@ sub get_all_attributes {
     return @attrs;
 }
 
+sub get_attribute {
+    my ($self, $name) = @_;
+    return $self->{attributes}{$name};
+}
+
+sub find_attribute_by_name {
+    my ($self, $name) = @_;
+    for ($self->get_all_attributes) {
+        return $_ if $_->name eq $name;
+    }
+    return;
+}
+
+package Moos::Meta::Attribute;
+
+our @ISA = 'Moos::Object';
+
+__PACKAGE__->meta->add_attribute($_, {is=>'ro'})
+    for qw(
+        name associated_class is isa coerce does required
+        weak_ref lazy trigger handles builder default clearer
+        predicate documentation
+    );
+
 package Moos::Object;
 
 sub new {
@@ -322,7 +349,7 @@ sub dump {
 }
 
 sub meta {
-    Moos::MOP::Class->initialize(Scalar::Util::blessed($_[0]) || $_[0]);
+    Moos::Meta::Class->initialize(Scalar::Util::blessed($_[0]) || $_[0]);
 }
 
 1;
