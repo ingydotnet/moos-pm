@@ -29,7 +29,11 @@ our $CAN_HAZ_XS =
     !$ENV{MOOS_XS_DISABLE} &&
     eval{ require Class::XSAccessor; Class::XSAccessor->VERSION("1.07"); 1 };
 
+sub default_class_metaclass { 'Moos::Meta::Class' }
+sub default_base_class      { 'Moos::Object' }
+
 sub import {
+    my ($class, %args) = @_;
     # Get name of the "class" from whence "use Moos;"
     my $package = caller;
 
@@ -38,10 +42,16 @@ sub import {
     warnings->import;
 
     # Create/register a metaclass object for the package
-    my $meta = Moos::Meta::Class->initialize($package);
+    my $metaclass =
+        delete $args{class_metaclass}
+        || $class->default_class_metaclass;
+    my $meta = $metaclass->initialize($package, %args);
 
     # Make calling class inherit from Moos::Object by default
-    extends($meta, 'Moos::Object');
+    my $baseclass =
+        delete $args{base_class}
+        || $class->default_base_class;
+    extends($meta, $baseclass);
 
     # Export the 'has' and 'extends' helper functions
     _export($package, has => \&has, $meta);
@@ -121,9 +131,26 @@ my $meta_class_objects = {};
 # Helper method to get class name:
 sub name { $_[0]->{package} }
 
+sub default_attribute_metaclass { 'Moos::Meta::Attribute' }
+
+# read-only accessor
+sub attribute_metaclass {
+    $_[0]{attribute_metaclass};
+}
+__PACKAGE__->meta->add_attribute(
+    attribute_metaclass => {
+        is          => 'ro',
+        default     => \&default_attribute_metaclass,
+        _skip_setup => 1,
+    },
+);
+
 # Either looking the existing meta-class-object or register a new one:
 sub initialize {
-    my ($class, $package) = @_;
+    my ($class, $package, %args) = @_;
+
+    # Class to use to generate attribute accessors, etc
+    $args{attribute_metaclass} ||= $class->default_attribute_metaclass;
 
     # This is a tiny version of a Moose meta-class-object.
     # We really just need a place to keep the attributes.
@@ -134,6 +161,7 @@ sub initialize {
             attributes => {},
             # We construct with attribute in order defined. (Unlike Moose)
             _attributes => [],
+            %args,
         }, $class;
     };
 }
@@ -145,7 +173,7 @@ sub add_attribute {
     my $name = shift;
     my %args = @_==1 ? %{$_[0]} : @_;
 
-    my $attribute = Moos::Meta::Attribute->new(
+    my $attribute = $self->attribute_metaclass->new(
         name             => $name,
         associated_class => $self,
         %args,
@@ -258,7 +286,7 @@ __PACKAGE__->meta->add_attribute($_, { is=>'ro' })
     for qw(
         name associated_class is isa coerce does required
         weak_ref lazy trigger handles builder default clearer
-        predicate documentation
+        predicate documentation _skip_setup
     );
 
 sub is_smiple {
@@ -271,7 +299,7 @@ sub is_smiple {
 # Not sure why it is necessary to override &new here...
 sub new {
     my $class = shift;
-    my $self  = bless $class->BUILDARGS(@_);
+    my $self  = bless $class->BUILDARGS(@_) => $class;
     $self->Moos::Object::BUILDALL;
     return $self;
 }
@@ -298,10 +326,12 @@ sub BUILD {
     my $self      = shift;
     my $metaclass = $self->{associated_class} or return;
     
-    $self->_setup_accessor($metaclass);
-    $self->_setup_clearer($metaclass)    if $self->{clearer};
-    $self->_setup_predicate($metaclass)  if $self->{predicate};
-    $self->_setup_delegation($metaclass) if $self->{handles};
+    unless ( $self->{_skip_setup} ) {
+        $self->_setup_accessor($metaclass);
+        $self->_setup_clearer($metaclass)    if $self->{clearer};
+        $self->_setup_predicate($metaclass)  if $self->{predicate};
+        $self->_setup_delegation($metaclass) if $self->{handles};
+    }
 }
 
 # Make a Setter/Getter accessor
