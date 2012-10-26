@@ -25,6 +25,9 @@ use Scalar::Util;
 use Carp qw(confess);
 
 our $VERSION = '0.06';
+our $CAN_HAZ_XS =
+    !$ENV{MOOS_XS_DISABLE} &&
+    eval{ require Class::XSAccessor; Class::XSAccessor->VERSION("1.07"); 1 };
 
 sub import {
     # Get name of the "class" from whence "use Moos;"
@@ -70,82 +73,14 @@ sub has {
     %args = (%args, @_);
 
     # Add attribute to meta class object
-    $meta->add_attribute($name => %args);
-
-    # Make a Setter/Getter accessor
-    my ($builder, $default) = @args{qw(builder default)};
-    $builder = "_build_$name"
-        if defined $builder && $builder eq "1";
-    my $accessor =
-        $builder ? sub {
-            $#_ ? $_[0]{$name} = $_[1] :
-            exists($_[0]{$name}) ? $_[0]{$name} :
-            ($_[0]{$name} = $_[0]->$builder);
-        } :
-        $default ? sub {
-            $#_ ? $_[0]{$name} = $_[1] :
-            exists($_[0]{$name}) ? $_[0]{$name} :
-            ($_[0]{$name} = $default->($_[0]));
-        } :
-        sub {
-            $#_ ? $_[0]{$name} = $_[1] : $_[0]{$name};
-        };
-
-    # Support (is => 'ro')
-    if (exists $args{is} and $args{is} eq 'ro') {
-        my $orig = $accessor;
-        $accessor = sub {
-            confess "cannot set value for read-only accessor '$name'"
-                if @_ > 1;
-            goto $orig;
-        };
-    }
-
-    # Dev debug thing to trace calls to accessor subs.
-    $accessor = _trace_accessor_calls($name, $accessor)
-        if $ENV{PERL_MOOS_ACCESSOR_CALLS};
-
-    # Export the accessor.
-    _export($meta->{package}, $name, $accessor);
-
-    # Clearer
-    if (exists $args{clearer}) {
-        my $clearer = $args{clearer};
-        $clearer = $name =~ /^_/ ? "_clear$name" : "clear_$name"
-            if $clearer eq "1";
-        my $sub = sub { delete $_[0]{$name} };
-        _export($meta->{package}, $clearer, $sub);
-    }
-
-    # Predicate
-    if (exists $args{predicate}) {
-        my $predicate = $args{predicate};
-        $predicate = $name =~ /^_/ ? "_has$name" : "has_$name"
-            if $predicate eq "1";
-        my $sub = sub { exists $_[0]{$name} };
-        _export($meta->{package}, $predicate, $sub);
-    }
-
-    # Delegated methods
-    if (exists $args{handles}) {
-        my %map;
-        %map = %{$args{handles}}
-            if Scalar::Util::reftype($args{handles}) eq 'HASH';
-        %map = map { ;$_=>$_ } @{$args{handles}}
-            if Scalar::Util::reftype($args{handles}) eq 'ARRAY';
-        while (my ($local, $remote) = each %map) {
-            my $sub = sub { shift->{$name}->$remote(@_) };
-            _export($meta->{package}, $local, $sub);
-        }
-    }
+    $meta->add_attribute($name => \%args);
 }
 
 # Inheritance maker
 sub extends {
-    my ($meta, $parent) = @_;
-    eval "require $parent";
-    no strict 'refs';
-    @{"$meta->{package}\::ISA"} = ($parent);
+    my ($meta, @parent) = @_;
+    eval "require $_" for @parent;
+    $meta->superclasses(@parent);
 }
 
 # Use this for exports and meta-exports
@@ -173,30 +108,11 @@ sub _export_xxx {
     _export($package, ZZZ => \&{__PACKAGE__ . '::ZZZ'});
 }
 
-# A tracing wrapper for debugging accessors
-my $trace_exclude = +{
-    map {($_, 1)} (
-        'Some::Module some_accessor',
-        'Some::Module some_other_accessor',
-    )
-};
-sub _trace_accessor_calls {
-    require Time::HiRes;
-    my ($name, $accessor) = @_;
-    sub {
-        my ($pkg, $file, $line, $sub) = caller(0);
-        unless ($trace_exclude->{"$pkg $name"}) {
-            warn "$pkg $name $line\n";
-            Time::HiRes::usleep(100000);
-        }
-        goto &$accessor;
-    };
-}
-
 # The remainder of this module was heavily inspired by Moose, and tried to do
 # what Moose does, only much less.
 package Moos::Meta::Class;
 use Carp qw(confess);
+our @ISA = 'Moos::Object';
 
 # Store all the Moos meta-class-objects in a private hash, keyed on
 # package/class name:
@@ -226,14 +142,137 @@ sub initialize {
 # we can preserve the order defined.
 sub add_attribute {
     my $self = shift;
-    my ($name, %args) = @_;
-    push @{$self->{_attributes}}, (
+    my $name = shift;
+    my %args = @_==1 ? %{$_[0]} : @_;
+
+    # Massage %args
+    $args{builder} = "_build_$name"
+        if defined $args{builder} && $args{builder} eq "1";
+    $args{clearer} = $name =~ /^_/ ? "_clear$name" : "clear_$name"
+        if defined $args{clearer} && $args{clearer} eq "1";
+    $args{predicate} = $name =~ /^_/ ? "_has$name" : "has_$name"
+        if defined $args{predicate} && $args{predicate} eq "1";
+    $args{is} = 'rw'
+        unless defined $args{is};
+
+    my $simple = 1;
+    $simple = 0
+        if $args{builder}
+        || $args{default}
+        || $ENV{PERL_MOOS_ACCESSOR_CALLS};
+
+    # Make a Setter/Getter accessor
+    if ($simple and $Moos::CAN_HAZ_XS) {
+        my $type = $args{is} eq 'ro' ? 'getters' : 'accessors';
+        Class::XSAccessor->import(
+            class => $self->{package},
+            $type => [$name],
+        );
+    }
+    else {
+        my ($builder, $default) = @args{qw(builder default)};
+        my $accessor =
+            $builder ? sub {
+                $#_ ? $_[0]{$name} = $_[1] :
+                exists($_[0]{$name}) ? $_[0]{$name} :
+                ($_[0]{$name} = $_[0]->$builder);
+            } :
+            $default ? sub {
+                $#_ ? $_[0]{$name} = $_[1] :
+                exists($_[0]{$name}) ? $_[0]{$name} :
+                ($_[0]{$name} = $default->($_[0]));
+            } :
+            sub {
+                $#_ ? $_[0]{$name} = $_[1] : $_[0]{$name};
+            };
+
+        if ($args{is} eq 'ro') {
+            my $orig = $accessor;
+            $accessor = sub {
+                confess "cannot set value for read-only accessor '$name'" if @_ > 1;
+                goto $orig;
+            };
+        }
+
+        # Dev debug thing to trace calls to accessor subs.
+        $accessor = _trace_accessor_calls($name, $accessor)
+            if $ENV{PERL_MOOS_ACCESSOR_CALLS};
+
+        # Export the accessor.
+        Moos::_export($self->{package}, $name, $accessor);
+    } # /non-XS
+    
+    # Clearer
+    if (my $clearer = $args{clearer}) {
+        my $sub = sub { delete $_[0]{$name} };
+        Moos::_export($self->{package}, $clearer, $sub);
+    }
+
+    # Predicate
+    if (my $predicate = $args{predicate}) {
+        if ($Moos::CAN_HAZ_XS) {
+            Class::XSAccessor->import(
+                class      => $self->{package},
+                predicates => { $predicate => $name },
+            );
+        }
+        else {
+            my $sub = sub { exists $_[0]{$name} };
+            Moos::_export($self->{package}, $predicate, $sub);
+        }
+    }
+
+    # Delegated methods
+    if (exists $args{handles}) {
+        my %map;
+        %map = %{$args{handles}}
+            if Scalar::Util::reftype($args{handles}) eq 'HASH';
+        %map = map { ;$_=>$_ } @{$args{handles}}
+            if Scalar::Util::reftype($args{handles}) eq 'ARRAY';
+        while (my ($local, $remote) = each %map) {
+            my $sub = sub { shift->{$name}->$remote(@_) };
+            Moos::_export($self->{package}, $local, $sub);
+        }
+    }
+
+   push @{$self->{_attributes}}, (
         $self->{attributes}{$name} =
             bless {
                 name => $name,
+                name             => $name,
+                associated_class => $self,
                 %args,
             }, 'Moos::Meta::Attribute'
     );
+}
+
+# A tracing wrapper for debugging accessors
+my $trace_exclude = +{
+    map {($_, 1)} (
+        'Some::Module some_accessor',
+        'Some::Module some_other_accessor',
+    )
+};
+sub _trace_accessor_calls {
+    require Time::HiRes;
+    my ($name, $accessor) = @_;
+    sub {
+        my ($pkg, $file, $line, $sub) = caller(0);
+        unless ($trace_exclude->{"$pkg $name"}) {
+            warn "$pkg $name $line\n";
+            Time::HiRes::usleep(100000);
+        }
+        goto &$accessor;
+    };
+}
+
+sub superclasses {
+    no strict 'refs';
+    my ($self, @supers) = @_;
+    if (@supers) {
+        @{"$self->{package}\::ISA"} = @supers;
+    }
+    return @{"$self->{package}\::ISA"};
 }
 
 # This is where new objects are constructed. (Moose style)
@@ -288,6 +327,32 @@ sub get_all_attributes {
     return @attrs;
 }
 
+# Cheap introspection stuff
+sub get_attribute {
+    my ($self, $name) = @_;
+    return $self->{attributes}{$name};
+}
+
+sub find_attribute_by_name {
+    my ($self, $name) = @_;
+    for ($self->get_all_attributes) {
+        return $_ if $_->name eq $name;
+    }
+    return;
+}
+
+# Package for blessed attributes
+package Moos::Meta::Attribute;
+
+our @ISA = 'Moos::Object';
+
+__PACKAGE__->meta->add_attribute($_, {is=>'ro'})
+    for qw(
+        name associated_class is isa coerce does required
+        weak_ref lazy trigger handles builder default clearer
+        predicate documentation
+    );
+
 # This is the default base class for all Moos classes:
 package Moos::Object;
 
@@ -330,7 +395,7 @@ sub dump {
 # Use to retrieve the (rather useless) Moos meta-class-object. Hey it's a
 # start. :)
 sub meta {
-    Moos::MOP::Class->initialize(Scalar::Util::blessed($_[0]) || $_[0]);
+    Moos::Meta::Class->initialize(Scalar::Util::blessed($_[0]) || $_[0]);
 }
 
 1;
