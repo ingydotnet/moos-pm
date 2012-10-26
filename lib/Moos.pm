@@ -531,7 +531,7 @@ this broke my toolchain (TestML, Module::Install, etc).
 I tried to inline L<Moo> into one file but failed, and ended up with this.
 I've shared Pegex::Base as L<Moos> in case any other projects want it.
 
-Later on, Toby added a bunch of low-cost but very features from Moose.
+Later on, Toby added a bunch of low-cost but very handy features from Moose.
 
 =head1 ON SPEED
 
