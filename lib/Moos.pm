@@ -25,8 +25,15 @@ use Scalar::Util;
 use Carp qw(confess);
 
 our $VERSION = '0.06';
+our $CAN_HAZ_XS =
+    !$ENV{MOOS_XS_DISABLE} &&
+    eval{ require Class::XSAccessor; Class::XSAccessor->VERSION("1.07"); 1 };
+
+sub default_metaclass   { 'Moos::Meta::Class' }
+sub default_base_class  { 'Moos::Object' }
 
 sub import {
+    my ($class, %args) = @_;
     # Get name of the "class" from whence "use Moos;"
     my $package = caller;
 
@@ -35,10 +42,16 @@ sub import {
     warnings->import;
 
     # Create/register a metaclass object for the package
-    my $meta = Moos::Meta::Class->initialize($package);
+    my $metaclass =
+        delete $args{metaclass}
+        || $class->default_metaclass;
+    my $meta = $metaclass->initialize($package, %args);
 
     # Make calling class inherit from Moos::Object by default
-    extends($meta, 'Moos::Object');
+    my $baseclass =
+        delete $args{base_class}
+        || $class->default_base_class;
+    extends($meta, $baseclass);
 
     # Export the 'has' and 'extends' helper functions
     _export($package, has => \&has, $meta);
@@ -70,82 +83,14 @@ sub has {
     %args = (%args, @_);
 
     # Add attribute to meta class object
-    $meta->add_attribute($name => %args);
-
-    # Make a Setter/Getter accessor
-    my ($builder, $default) = @args{qw(builder default)};
-    $builder = "_build_$name"
-        if defined $builder && $builder eq "1";
-    my $accessor =
-        $builder ? sub {
-            $#_ ? $_[0]{$name} = $_[1] :
-            exists($_[0]{$name}) ? $_[0]{$name} :
-            ($_[0]{$name} = $_[0]->$builder);
-        } :
-        $default ? sub {
-            $#_ ? $_[0]{$name} = $_[1] :
-            exists($_[0]{$name}) ? $_[0]{$name} :
-            ($_[0]{$name} = $default->($_[0]));
-        } :
-        sub {
-            $#_ ? $_[0]{$name} = $_[1] : $_[0]{$name};
-        };
-
-    # Support (is => 'ro')
-    if (exists $args{is} and $args{is} eq 'ro') {
-        my $orig = $accessor;
-        $accessor = sub {
-            confess "cannot set value for read-only accessor '$name'"
-                if @_ > 1;
-            goto $orig;
-        };
-    }
-
-    # Dev debug thing to trace calls to accessor subs.
-    $accessor = _trace_accessor_calls($name, $accessor)
-        if $ENV{PERL_MOOS_ACCESSOR_CALLS};
-
-    # Export the accessor.
-    _export($meta->{package}, $name, $accessor);
-
-    # Clearer
-    if (exists $args{clearer}) {
-        my $clearer = $args{clearer};
-        $clearer = $name =~ /^_/ ? "_clear$name" : "clear_$name"
-            if $clearer eq "1";
-        my $sub = sub { delete $_[0]{$name} };
-        _export($meta->{package}, $clearer, $sub);
-    }
-
-    # Predicate
-    if (exists $args{predicate}) {
-        my $predicate = $args{predicate};
-        $predicate = $name =~ /^_/ ? "_has$name" : "has_$name"
-            if $predicate eq "1";
-        my $sub = sub { exists $_[0]{$name} };
-        _export($meta->{package}, $predicate, $sub);
-    }
-
-    # Delegated methods
-    if (exists $args{handles}) {
-        my %map;
-        %map = %{$args{handles}}
-            if Scalar::Util::reftype($args{handles}) eq 'HASH';
-        %map = map { ;$_=>$_ } @{$args{handles}}
-            if Scalar::Util::reftype($args{handles}) eq 'ARRAY';
-        while (my ($local, $remote) = each %map) {
-            my $sub = sub { shift->{$name}->$remote(@_) };
-            _export($meta->{package}, $local, $sub);
-        }
-    }
+    $meta->add_attribute($name => \%args);
 }
 
 # Inheritance maker
 sub extends {
-    my ($meta, $parent) = @_;
-    eval "require $parent";
-    no strict 'refs';
-    @{"$meta->{package}\::ISA"} = ($parent);
+    my ($meta, @parent) = @_;
+    eval "require $_" for @parent;
+    $meta->superclasses(@parent);
 }
 
 # Use this for exports and meta-exports
@@ -173,6 +118,70 @@ sub _export_xxx {
     _export($package, ZZZ => \&{__PACKAGE__ . '::ZZZ'});
 }
 
+# The remainder of this module was heavily inspired by Moose, and tried to do
+# what Moose does, only much less.
+package Moos::Meta::Class;
+use Carp qw(confess);
+our @ISA = 'Moos::Object';
+
+# Store all the Moos meta-class-objects in a private hash, keyed on
+# package/class name:
+my $meta_class_objects = {};
+
+# Helper method to get class name:
+sub name { $_[0]->{package} }
+
+sub default_attribute_metaclass { 'Moos::Meta::Attribute' }
+
+# read-only accessor
+sub attribute_metaclass {
+    $_[0]{attribute_metaclass};
+}
+__PACKAGE__->meta->add_attribute(
+    attribute_metaclass => {
+        is          => 'ro',
+        default     => \&default_attribute_metaclass,
+        _skip_setup => 1,
+    },
+);
+
+# Either looking the existing meta-class-object or register a new one:
+sub initialize {
+    my ($class, $package, %args) = @_;
+
+    # Class to use to generate attribute accessors, etc
+    $args{attribute_metaclass} ||= $class->default_attribute_metaclass;
+
+    # This is a tiny version of a Moose meta-class-object.
+    # We really just need a place to keep the attributes.
+    return $meta_class_objects->{$package} //= do {
+        bless {
+            package => $package,
+            # This isn't currently used but matches Moose and is cheap.
+            attributes => {},
+            # We construct with attribute in order defined. (Unlike Moose)
+            _attributes => [],
+            %args,
+        }, $class;
+    };
+}
+
+# Make a new attrribute object and add it to both a hash and an array, so that
+# we can preserve the order defined.
+sub add_attribute {
+    my $self = shift;
+    my $name = shift;
+    my %args = @_==1 ? %{$_[0]} : @_;
+
+    my $attribute = $self->attribute_metaclass->new(
+        name             => $name,
+        associated_class => $self,
+        %args,
+    );
+    push @{$self->{_attributes}}, $attribute;
+    $self->{attributes}{$name} = $attribute;
+}
+
 # A tracing wrapper for debugging accessors
 my $trace_exclude = +{
     map {($_, 1)} (
@@ -193,47 +202,13 @@ sub _trace_accessor_calls {
     };
 }
 
-# The remainder of this module was heavily inspired by Moose, and tried to do
-# what Moose does, only much less.
-package Moos::Meta::Class;
-use Carp qw(confess);
-
-# Store all the Moos meta-class-objects in a private hash, keyed on
-# package/class name:
-my $meta_class_objects = {};
-
-# Helper method to get class name:
-sub name { $_[0]->{package} }
-
-# Either looking the existing meta-class-object or register a new one:
-sub initialize {
-    my ($class, $package) = @_;
-
-    # This is a tiny version of a Moose meta-class-object.
-    # We really just need a place to keep the attributes.
-    return $meta_class_objects->{$package} //= do {
-        bless {
-            package => $package,
-            # This isn't currently used but matches Moose and is cheap.
-            attributes => {},
-            # We construct with attribute in order defined. (Unlike Moose)
-            _attributes => [],
-        }, $class;
-    };
-}
-
-# Make a new attrribute object and add it to both a hash and an array, so that
-# we can preserve the order defined.
-sub add_attribute {
-    my $self = shift;
-    my ($name, %args) = @_;
-    push @{$self->{_attributes}}, (
-        $self->{attributes}{$name} =
-            bless {
-                name => $name,
-                %args,
-            }, 'Moos::Meta::Attribute'
-    );
+sub superclasses {
+    no strict 'refs';
+    my ($self, @supers) = @_;
+    if (@supers) {
+        @{"$self->{package}\::ISA"} = @supers;
+    }
+    return @{"$self->{package}\::ISA"};
 }
 
 # This is where new objects are constructed. (Moose style)
@@ -288,6 +263,176 @@ sub get_all_attributes {
     return @attrs;
 }
 
+# Cheap introspection stuff
+sub get_attribute {
+    my ($self, $name) = @_;
+    return $self->{attributes}{$name};
+}
+
+sub find_attribute_by_name {
+    my ($self, $name) = @_;
+    for ($self->get_all_attributes) {
+        return $_ if $_->name eq $name;
+    }
+    return;
+}
+
+# Package for blessed attributes
+package Moos::Meta::Attribute;
+use Carp qw(confess);
+BEGIN { our @ISA = 'Moos::Object' };
+
+__PACKAGE__->meta->add_attribute($_, { is=>'ro' })
+    for qw(
+        name associated_class is isa coerce does required
+        weak_ref lazy trigger handles builder default clearer
+        predicate documentation _skip_setup
+    );
+
+sub _is_smiple {
+    not (  $_[0]{builder}
+        || $_[0]{default}
+        || $ENV{PERL_MOOS_ACCESSOR_CALLS}
+    );
+}
+
+# Not sure why it is necessary to override &new here...
+sub new {
+    my $class = shift;
+    my $self  = bless $class->BUILDARGS(@_) => $class;
+    $self->Moos::Object::BUILDALL;
+    return $self;
+}
+
+sub BUILDARGS {
+    shift;
+    my $args = @_==1 ? $_[0] : +{@_};
+    
+    # Massage %args
+    my $name = $args->{name};
+    $args->{builder} = "_build_$name"
+        if defined $args->{builder} && $args->{builder} eq "1";
+    $args->{clearer} = $name =~ /^_/ ? "_clear$name" : "clear_$name"
+        if defined $args->{clearer} && $args->{clearer} eq "1";
+    $args->{predicate} = $name =~ /^_/ ? "_has$name" : "has_$name"
+        if defined $args->{predicate} && $args->{predicate} eq "1";
+    $args->{is} = 'rw'
+        unless defined $args->{is};
+    
+    return $args;
+}
+
+sub BUILD {
+    my $self      = shift;
+    my $metaclass = $self->{associated_class} or return;
+    
+    unless ( $self->{_skip_setup} ) {
+        $self->_setup_accessor($metaclass);
+        $self->_setup_clearer($metaclass)    if $self->{clearer};
+        $self->_setup_predicate($metaclass)  if $self->{predicate};
+        $self->_setup_delegation($metaclass) if $self->{handles};
+    }
+}
+
+# Make a Setter/Getter accessor
+sub _setup_accessor
+{
+    my ($self, $metaclass) = @_;
+    my $name = $self->{name};
+    
+    if ($self->_is_smiple and $Moos::CAN_HAZ_XS) {
+        my $type = $self->{is} eq 'ro' ? 'getters' : 'accessors';
+        Class::XSAccessor->import(
+            class => $metaclass->{package},
+            $type => [$name],
+        );
+        return;
+    }
+
+    my ($builder, $default) = map $self->{$_}, qw(builder default);
+    my $accessor =
+        $builder ? sub {
+            $#_ ? $_[0]{$name} = $_[1] :
+            exists($_[0]{$name}) ? $_[0]{$name} :
+            ($_[0]{$name} = $_[0]->$builder);
+        } :
+        $default ? sub {
+            $#_ ? $_[0]{$name} = $_[1] :
+            exists($_[0]{$name}) ? $_[0]{$name} :
+            ($_[0]{$name} = $default->($_[0]));
+        } :
+        sub {
+            $#_ ? $_[0]{$name} = $_[1] : $_[0]{$name};
+        };
+
+    if ($self->{is} eq 'ro') {
+        my $orig = $accessor;
+        $accessor = sub {
+            confess "cannot set value for read-only accessor '$name'" if @_ > 1;
+            goto $orig;
+        };
+    }
+
+    # Dev debug thing to trace calls to accessor subs.
+    $accessor = _trace_accessor_calls($name, $accessor)
+        if $ENV{PERL_MOOS_ACCESSOR_CALLS};
+
+    # Export the accessor.
+    Moos::_export($metaclass->{package}, $name, $accessor);
+    return;
+}
+
+sub _setup_clearer
+{
+    my ($self, $metaclass) = @_;
+    my $name = $self->{name};
+    
+    my $clearer = $self->{clearer} or return;
+    my $sub = sub { delete $_[0]{$name} };
+    Moos::_export($metaclass->{package}, $clearer, $sub);
+    return;
+}
+
+sub _setup_predicate
+{
+    my ($self, $metaclass) = @_;
+    my $name = $self->{name};
+    
+    my $predicate = $self->{predicate} or return;
+    
+    if ($Moos::CAN_HAZ_XS) {
+        Class::XSAccessor->import(
+            class      => $metaclass->{package},
+            predicates => { $predicate => $name },
+        );
+        return;
+    }
+
+    my $sub = sub { exists $_[0]{$name} };
+    Moos::_export($metaclass->{package}, $predicate, $sub);
+    return;
+}
+
+sub _setup_delegation
+{
+    my ($self, $metaclass) = @_;
+    my $name = $self->{name};
+    
+    return unless exists $self->{handles};
+    
+    my %map;
+    %map = %{$self->{handles}}
+        if Scalar::Util::reftype($self->{handles}) eq 'HASH';
+    %map = map { ;$_=>$_ } @{$self->{handles}}
+        if Scalar::Util::reftype($self->{handles}) eq 'ARRAY';
+        
+    while (my ($local, $remote) = each %map) {
+        my $sub = sub { shift->{$name}->$remote(@_) };
+        Moos::_export($metaclass->{package}, $local, $sub);
+    }
+    return;
+}
+
 # This is the default base class for all Moos classes:
 package Moos::Object;
 
@@ -330,7 +475,7 @@ sub dump {
 # Use to retrieve the (rather useless) Moos meta-class-object. Hey it's a
 # start. :)
 sub meta {
-    Moos::MOP::Class->initialize(Scalar::Util::blessed($_[0]) || $_[0]);
+    Moos::Meta::Class->initialize(Scalar::Util::blessed($_[0]) || $_[0]);
 }
 
 1;
