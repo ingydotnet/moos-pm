@@ -26,6 +26,10 @@ use Carp qw(confess);
 
 our $VERSION = '0.05';
 
+our $CAN_HAZ_XS =
+    !$ENV{MOOS_XS_DISABLE} &&
+    eval{ require Class::XSAccessor; Class::XSAccessor->VERSION("1.07"); 1 };
+
 sub import {
     # Get name of the "class" from whence "use Moos;"
     my $package = caller;
@@ -142,51 +146,74 @@ sub add_attribute {
         if defined $args{clearer} && $args{clearer} eq "1";
     $args{predicate} = $name =~ /^_/ ? "_has$name" : "has_$name"
         if defined $args{predicate} && $args{predicate} eq "1";
+    $args{is} = 'rw'
+        unless defined $args{is};
+
+    my $simple = 1;
+    $simple = 0
+        if $args{builder}
+        || $args{default}
+        || $ENV{PERL_MOOS_ACCESSOR_CALLS};
 
     # Make a Setter/Getter accessor
-    my ($builder, $default) = @args{qw(builder default)};
-    my $accessor =
-        $builder ? sub {
-            $#_ ? $_[0]{$name} = $_[1] :
-            exists($_[0]{$name}) ? $_[0]{$name} :
-            ($_[0]{$name} = $_[0]->$builder);
-        } :
-        $default ? sub {
-            $#_ ? $_[0]{$name} = $_[1] :
-            exists($_[0]{$name}) ? $_[0]{$name} :
-            ($_[0]{$name} = $default->($_[0]));
-        } :
-        sub {
-            $#_ ? $_[0]{$name} = $_[1] : $_[0]{$name};
-        };
-
-    if (exists $args{is} and $args{is} eq 'ro') {
-        my $orig = $accessor;
-        $accessor = sub {
-            confess "cannot set value for read-only accessor '$name'" if @_ > 1;
-            goto $orig;
-        };
+    if ($simple and $Moos::CAN_HAZ_XS) {
+        my $type = $args{is} eq 'ro' ? 'getters' : 'accessors';
+        Class::XSAccessor->import(
+            class => $self->{package},
+            $type => [$name],
+        );
     }
+    else {
+        my ($builder, $default) = @args{qw(builder default)};
+        my $accessor =
+            $builder ? sub {
+                $#_ ? $_[0]{$name} = $_[1] :
+                exists($_[0]{$name}) ? $_[0]{$name} :
+                ($_[0]{$name} = $_[0]->$builder);
+            } :
+            $default ? sub {
+                $#_ ? $_[0]{$name} = $_[1] :
+                exists($_[0]{$name}) ? $_[0]{$name} :
+                ($_[0]{$name} = $default->($_[0]));
+            } :
+            sub {
+                $#_ ? $_[0]{$name} = $_[1] : $_[0]{$name};
+            };
 
-    # Dev debug thing to trace calls to accessor subs.
-    $accessor = _trace_accessor_calls($name, $accessor)
-        if $ENV{PERL_MOOS_ACCESSOR_CALLS};
+        if ($args{is} eq 'ro') {
+            my $orig = $accessor;
+            $accessor = sub {
+                confess "cannot set value for read-only accessor '$name'" if @_ > 1;
+                goto $orig;
+            };
+        }
 
-    # Export the accessor.
-    Moos::_export($self->{package}, $name, $accessor);
+        # Dev debug thing to trace calls to accessor subs.
+        $accessor = _trace_accessor_calls($name, $accessor)
+            if $ENV{PERL_MOOS_ACCESSOR_CALLS};
 
+        # Export the accessor.
+        Moos::_export($self->{package}, $name, $accessor);
+    } # /non-XS
+    
     # Clearer
-    if (exists $args{clearer}) {
-        my $clearer = $args{clearer};
+    if (my $clearer = $args{clearer}) {
         my $sub = sub { delete $_[0]{$name} };
         Moos::_export($self->{package}, $clearer, $sub);
     }
 
     # Predicate
-    if (exists $args{predicate}) {
-        my $predicate = $args{predicate};
-        my $sub = sub { exists $_[0]{$name} };
-        Moos::_export($self->{package}, $predicate, $sub);
+    if (my $predicate = $args{predicate}) {
+        if ($Moos::CAN_HAZ_XS) {
+            Class::XSAccessor->import(
+                class      => $self->{package},
+                predicates => { $predicate => $name },
+            );
+        }
+        else {
+            my $sub = sub { exists $_[0]{$name} };
+            Moos::_export($self->{package}, $predicate, $sub);
+        }
     }
 
     # Delegated methods
