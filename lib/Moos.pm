@@ -29,8 +29,8 @@ our $CAN_HAZ_XS =
     !$ENV{MOOS_XS_DISABLE} &&
     eval{ require Class::XSAccessor; Class::XSAccessor->VERSION("1.07"); 1 };
 
-sub default_class_metaclass { 'Moos::Meta::Class' }
-sub default_base_class      { 'Moos::Object' }
+sub default_metaclass   { 'Moos::Meta::Class' }
+sub default_base_class  { 'Moos::Object' }
 
 sub import {
     my ($class, %args) = @_;
@@ -43,8 +43,8 @@ sub import {
 
     # Create/register a metaclass object for the package
     my $metaclass =
-        delete $args{class_metaclass}
-        || $class->default_class_metaclass;
+        delete $args{metaclass}
+        || $class->default_metaclass;
     my $meta = $metaclass->initialize($package, %args);
 
     # Make calling class inherit from Moos::Object by default
@@ -289,7 +289,7 @@ __PACKAGE__->meta->add_attribute($_, { is=>'ro' })
         predicate documentation _skip_setup
     );
 
-sub is_smiple {
+sub _is_smiple {
     not (  $_[0]{builder}
         || $_[0]{default}
         || $ENV{PERL_MOOS_ACCESSOR_CALLS}
@@ -340,7 +340,7 @@ sub _setup_accessor
     my ($self, $metaclass) = @_;
     my $name = $self->{name};
     
-    if ($self->is_smiple and $Moos::CAN_HAZ_XS) {
+    if ($self->_is_smiple and $Moos::CAN_HAZ_XS) {
         my $type = $self->{is} eq 'ro' ? 'getters' : 'accessors';
         Class::XSAccessor->import(
             class => $metaclass->{package},
