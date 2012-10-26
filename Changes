@@ -1,4 +1,10 @@
 ---
+version: 0.06
+date:    Thu Oct 25 16:51:29 PDT 2012
+changes:
+- Apply tobyink++'s patches for 'is', clearer, predicate, confess, blessed and
+  more.
+---
 version: 0.05
 date:    Thu Oct 25 12:44:58 PDT 2012
 changes:
