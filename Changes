@@ -1,4 +1,10 @@
 ---
+version: 0.07
+date:    
+changes:
+- Apply tobyink++'s https://github.com/ingydotnet/moos-pm/pull/7
+- Can has XS accessors now
+---
 version: 0.06
 date:    Thu Oct 25 16:51:29 PDT 2012
 changes:
