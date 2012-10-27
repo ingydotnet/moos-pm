@@ -10,7 +10,7 @@ use mro;
 use Scalar::Util;
 use Carp qw(confess);
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 our $CAN_HAZ_XS =
     !$ENV{PERL_MOOS_XS_DISABLE} &&
