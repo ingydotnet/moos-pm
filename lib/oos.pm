@@ -1,23 +1,23 @@
 package oos;
 
 sub import {
-    moos(), exit if $0 eq '-';
+    moos() if $0 eq '-';
     require Moos;
     splice @_, 0, 1, 'Moos';
     goto &Moos::import;
 }
 
 sub moos {
-  print <<'EOMOO';
- ______                      ______
-< Moo! >                    < Moo! >
- ------                      ------
-        \   ^__^                    \   ^__^
-         \  (oo)\_______             \  (oo)\_______
-            (__)\       )\/\            (__)\       )\/\
-                ||----w |                   ||----w |
-                ||     ||                   ||     ||
-EOMOO
+  print <<'EOEOMOO';
+                              ______   ______
+                             < Moo! > < !ooM >
+                              ------   ------
+                     ^__^   /                 \   ^__^
+             _______/(oo)  /                   \  (oo)\_______
+         /\/) ingy  /(__)                         (__)\  mst  )\/\
+            | w----||                              /  ||----w |
+            ||     ||                                 ||     ||
+EOEOMOO
   exit 0;
 }
 
