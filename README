@@ -173,7 +173,8 @@ WHENCE
     I tried to inline Moo into one file but failed, and ended up with this.
     I've shared Pegex::Base as Moos in case any other projects want it.
 
-    Later on, Toby added a bunch of low-cost but very features from Moose.
+    Later on, Toby added a bunch of low-cost but very handy features from
+    Moose.
 
 ON SPEED
     In the end, I got Pegex to run even faster with Moos than it originally
