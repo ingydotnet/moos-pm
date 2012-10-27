@@ -1,18 +1,3 @@
-##
-# name:      Moos
-# abstract:  Moo s{imple,peedy,ingle}
-# author: Ingy döt Net <ingy@cpan.org>
-# license:   perl
-# copyright: 2012
-# see:
-# - M
-# - Mo
-# - Moo
-# - Moos
-# - Moose
-# - Mouse
-# - Mousse
-
 # The entire implementation of Moos (and all its related classes)
 # are defined inside this one file.
 use strict;
@@ -20,6 +5,7 @@ use warnings;
 
 package Moos;
 use v5.10.0;
+
 use mro;
 use Scalar::Util;
 use Carp qw(confess);
@@ -167,20 +153,21 @@ sub initialize {
     };
 }
 
-# Make a new attrribute object and add it to both a hash and an array, so that
+# Make a new attribute object and add it to both a hash and an array, so that
 # we can preserve the order defined.
 sub add_attribute {
     my $self = shift;
     my $name = shift;
     my %args = @_==1 ? %{$_[0]} : @_;
 
-    my $attribute = $self->attribute_metaclass->new(
-        name             => $name,
-        associated_class => $self,
-        %args,
+    push @{$self->{_attributes}}, (
+        $self->{attributes}{$name} =
+        $self->attribute_metaclass->new(
+            name             => $name,
+            associated_class => $self,
+            %args,
+        )
     );
-    push @{$self->{_attributes}}, $attribute;
-    $self->{attributes}{$name} = $attribute;
 }
 
 # A tracing wrapper for debugging accessors
@@ -380,11 +367,11 @@ sub _setup_accessor
 
     # Export the accessor.
     Moos::_export($metaclass->{package}, $name, $accessor);
+
     return;
 }
 
-sub _setup_clearer
-{
+sub _setup_clearer {
     my ($self, $metaclass) = @_;
     my $name = $self->{name};
 
@@ -394,8 +381,7 @@ sub _setup_clearer
     return;
 }
 
-sub _setup_predicate
-{
+sub _setup_predicate {
     my ($self, $metaclass) = @_;
     my $name = $self->{name};
 
@@ -414,8 +400,7 @@ sub _setup_predicate
     return;
 }
 
-sub _setup_delegation
-{
+sub _setup_delegation {
     my ($self, $metaclass) = @_;
     my $name = $self->{name};
 
@@ -481,6 +466,12 @@ sub meta {
 
 1;
 
+=encoding utf8
+
+=head1 NAME
+
+Moos - Moo s{imple,peedy,ingle}
+
 =head1 SYNOPSIS
 
     package Foos;
@@ -511,7 +502,7 @@ sub meta {
 Moos completes the M to Moose sequence of Perl OO modules.
 
 This one is pure Perl, no dependencies, single file and Moose compatible (for
-what it does). It is fairly minimal.
+what it does).
 
 =head1 FEATURES
 
@@ -530,6 +521,9 @@ For inheritance. C<Moos::Object> is the default base class.
 
     package MyClass;
     extends 'MyBaseClass';
+
+Supports multiple inheritance, by allowing multiple classes on a single
+invocation.
 
 =item new
 
@@ -556,6 +550,10 @@ Accessor generator. Supports the C<is>, C<default>, C<build>, C<lazy>,
 C<clearer>, C<predicate>, C<required> and C<handles> options, described below.
 
     has this => ();
+
+NOTE: Class::XSACcessor will be used for simple accessors if it is installed.
+This can be disabled by setting $Moos::CAN_HAZ_XS to false or by setting the
+PERL_MOOS_XS_DISABLE to true.
 
 =item is
 
@@ -712,7 +710,39 @@ calls like they would expect to.
 I'm sure I've missed some subtlties, and would be glad to hear opinions, but
 in the meantime I'm happy that my code is faster and pure Perl.
 
-=head1 CREDITS
+=head1 SEE ALSO
 
-Toby Inkster <tobyink@cpan.org> submitted a number of great pull requests,
-making Moos a little bit more like Moose.
+=over
+
+=item * L<M>
+
+=item * L<Mo>
+
+=item * L<Moo>
+
+=item * L<Moos>
+
+=item * L<Moose>
+
+=item * L<Mouse>
+
+=item * L<Mousse>
+
+=back
+
+=head1 AUTHORS
+
+Ingy döt Net <ingy@cpan.org>
+
+Toby Inkster <tobyink@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2012. Ingy döt Net.
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.
+
+See http://www.perl.com/perl/misc/Artistic.html
+
+=cut

@@ -29,7 +29,7 @@ DESCRIPTION
     Moos completes the M to Moose sequence of Perl OO modules.
 
     This one is pure Perl, no dependencies, single file and Moose compatible
-    (for what it does). It is fairly minimal.
+    (for what it does).
 
 FEATURES
     Here's a quick list of the Moose compatible features that are supported
@@ -43,6 +43,9 @@ FEATURES
 
             package MyClass;
             extends 'MyBaseClass';
+
+        Supports multiple inheritance, by allowing multiple classes on a
+        single invocation.
 
     new A constructor class method.
 
@@ -64,6 +67,10 @@ FEATURES
         below.
 
             has this => ();
+
+        NOTE: Class::XSACcessor will be used for simple accessors if it is
+        installed. This can be disabled by setting $Moos::CAN_HAZ_XS to
+        false or by setting the PERL_MOOS_XS_DISABLE to true.
 
     is  Specify which type of attribute accessor to provide. The default is
         "rw", a read-write accessor. Read-only "ro" accessors are also
@@ -200,10 +207,6 @@ ON SPEED
     I'm sure I've missed some subtlties, and would be glad to hear opinions,
     but in the meantime I'm happy that my code is faster and pure Perl.
 
-CREDITS
-    Toby Inkster <tobyink@cpan.org> submitted a number of great pull
-    requests, making Moos a little bit more like Moose.
-
 SEE ALSO
     *   M
 
@@ -219,8 +222,10 @@ SEE ALSO
 
     *   Mousse
 
-AUTHOR
+AUTHORS
     Ingy döt Net <ingy@cpan.org>
+
+    Toby Inkster <tobyink@cpan.org>
 
 COPYRIGHT AND LICENSE
     Copyright (c) 2012. Ingy döt Net.
