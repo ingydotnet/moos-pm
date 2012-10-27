@@ -24,13 +24,14 @@ use mro;
 use Scalar::Util;
 use Carp qw(confess);
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
+
 our $CAN_HAZ_XS =
-    !$ENV{MOOS_XS_DISABLE} &&
+    !$ENV{PERL_MOOS_XS_DISABLE} &&
     eval{ require Class::XSAccessor; Class::XSAccessor->VERSION("1.07"); 1 };
 
-sub default_metaclass   { 'Moos::Meta::Class' }
-sub default_base_class  { 'Moos::Object' }
+use constant default_metaclass => 'Moos::Meta::Class';
+use constant default_base_class => 'Moos::Object';
 
 sub import {
     my ($class, %args) = @_;
@@ -289,7 +290,7 @@ __PACKAGE__->meta->add_attribute($_, { is=>'ro' })
         predicate documentation _skip_setup
     );
 
-sub _is_smiple {
+sub _is_simple {
     not (  $_[0]{builder}
         || $_[0]{default}
         || $ENV{PERL_MOOS_ACCESSOR_CALLS}
@@ -307,7 +308,7 @@ sub new {
 sub BUILDARGS {
     shift;
     my $args = @_==1 ? $_[0] : +{@_};
-    
+
     # Massage %args
     my $name = $args->{name};
     $args->{builder} = "_build_$name"
@@ -318,14 +319,14 @@ sub BUILDARGS {
         if defined $args->{predicate} && $args->{predicate} eq "1";
     $args->{is} = 'rw'
         unless defined $args->{is};
-    
+
     return $args;
 }
 
 sub BUILD {
     my $self      = shift;
     my $metaclass = $self->{associated_class} or return;
-    
+
     unless ( $self->{_skip_setup} ) {
         $self->_setup_accessor($metaclass);
         $self->_setup_clearer($metaclass)    if $self->{clearer};
@@ -339,8 +340,8 @@ sub _setup_accessor
 {
     my ($self, $metaclass) = @_;
     my $name = $self->{name};
-    
-    if ($self->_is_smiple and $Moos::CAN_HAZ_XS) {
+
+    if ($self->_is_simple and $Moos::CAN_HAZ_XS) {
         my $type = $self->{is} eq 'ro' ? 'getters' : 'accessors';
         Class::XSAccessor->import(
             class => $metaclass->{package},
@@ -386,7 +387,7 @@ sub _setup_clearer
 {
     my ($self, $metaclass) = @_;
     my $name = $self->{name};
-    
+
     my $clearer = $self->{clearer} or return;
     my $sub = sub { delete $_[0]{$name} };
     Moos::_export($metaclass->{package}, $clearer, $sub);
@@ -397,9 +398,9 @@ sub _setup_predicate
 {
     my ($self, $metaclass) = @_;
     my $name = $self->{name};
-    
+
     my $predicate = $self->{predicate} or return;
-    
+
     if ($Moos::CAN_HAZ_XS) {
         Class::XSAccessor->import(
             class      => $metaclass->{package},
@@ -417,15 +418,15 @@ sub _setup_delegation
 {
     my ($self, $metaclass) = @_;
     my $name = $self->{name};
-    
+
     return unless exists $self->{handles};
-    
+
     my %map;
     %map = %{$self->{handles}}
         if Scalar::Util::reftype($self->{handles}) eq 'HASH';
     %map = map { ;$_=>$_ } @{$self->{handles}}
         if Scalar::Util::reftype($self->{handles}) eq 'ARRAY';
-        
+
     while (my ($local, $remote) = each %map) {
         my $sub = sub { shift->{$name}->$remote(@_) };
         Moos::_export($metaclass->{package}, $local, $sub);
