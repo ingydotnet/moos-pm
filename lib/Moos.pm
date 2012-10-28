@@ -359,9 +359,9 @@ sub _setup_accessor
                 $type => [$name],
             );
         }
-        elsif ($] >= 5.010) {
+        else {
             my $accessor = $self->{is} eq 'ro'
-                ? eval qq{ sub { \$_[0]{'$name'} } }
+                ? eval qq{ sub { Carp::confess("cannot set value for read-only accessor '$name'") if \@_ > 1; \$_[0]{'$name'} } }
                 : eval qq{ sub { \$#_ ? \$_[0]{'$name'} = \$_[1] : \$_[0]{'$name'} } };
             return Moos::_export($metaclass->{package}, $name, $accessor);
         }
