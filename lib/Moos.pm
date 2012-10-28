@@ -565,15 +565,18 @@ what it does).
 =head1 FEATURES
 
 Here's a quick list of the L<Moose> compatible features that are supported by
-L<Moos>:
+L<Moos>.
 
-=over
-
-=item strict / warnings
+=head2 strict / warnings
 
 Turns on C<strict> and C<warnings> for you.
 
-=item extends
+=head2 Helpful exports
+
+The ever useful C<blessed> (from L<Scalar::Util>) and C<confess> (from
+L<Carp>) are exported to your namespace.
+
+=head2 extends
 
 For inheritance. C<Moos::Object> is the default base class.
 
@@ -583,30 +586,12 @@ For inheritance. C<Moos::Object> is the default base class.
 Supports multiple inheritance, by allowing multiple classes on a single
 invocation.
 
-=item new
-
-A constructor class method.
-
-    my $object = MyClass->new(this => 'nice', that => 2);
-
-=item BUILD
-
-Custom object construction. If you define BUILD, it is passed the value of the
-new object during construction. You can modify the object. Any value you
-return is ignored.
-
-    sub BUILD { my $self = shift; ... }
-
-=item Helpful exports
-
-The ever useful C<blessed> (from L<Scalar::Util>) and C<confess> (from
-L<Carp>) are exported to your namespace.
-
-=item has
+=head2 has
 
 Accessor generator. Supports the C<is>, C<default>, C<build>, C<lazy>,
 C<clearer>, C<predicate>, C<required>, C<handles> and C<trigger> options,
-described below.
+described below. The supported options are about the same as Moose. Other
+arguments (e.g. C<isa> and C<coerce>) are currently ignored. 
 
     has this => ();
 
@@ -614,46 +599,23 @@ NOTE: Class::XSAccessor will be used for simple accessors if it is installed.
 This can be disabled by setting $Moos::CAN_HAZ_XS to false or by setting the
 PERL_MOOS_XS_DISABLE to true.
 
+=over
+
 =item is
 
 Specify which type of attribute accessor to provide. The default is "rw",
 a read-write accessor. Read-only "ro" accessors are also supported.
 
     has this => ( is => "ro" );
+    has 'this';                   # read-write
+    has that => ();               # read-write
 
-=item default
+Unlike Moose, Moos cannot generate differently named getters and setters.
+If you want your setter named something different (e.g. a private method),
+then you could do something like:
 
-Specify the sub to generate a default value.
-
-    has this => ( default => sub { 42 } );
-
-=item builder
-
-Specify the method name to generate a default value.
-
-    has this => ( builder => '_build_this' );
-    has that => ( builder => 1 );  # accept default name for method
-
-=item lazy
-
-Don't generate defaults during object construction.
-
-    has this => ( builder => '_build_this', lazy => 1 );
-
-=item clearer
-
-Creates a clearer method.
-
-    has this => ( clearer => "clear_this" );
-    has that => ( clearer => 1 );  # accept default name for method
-
-=item predicate
-
-Creates a predicate method, which can be used to check if the attribute is
-set or unset.
-
-    has this => ( predicate => "has_this" );
-    has that => ( predicate => 1 );  # accept default name for method
+    has this => ( is => 'ro' );
+    sub _set_this { $_[0]{this} = $_[1] }
 
 =item required
 
@@ -662,14 +624,11 @@ generated during object construction.
 
     has this => ( required => 1 );
 
-=item handles
+=item lazy
 
-Delegated method calls.
+Don't generate defaults during object construction.
 
-    has wheels => (handles => [qw/ roll /]);
-
-This accepts a hashref or arrayref, but not the other possibilities
-offered by L<Moose>.
+    has this => ( builder => '_build_this', lazy => 1 );
 
 =item trigger
 
@@ -687,26 +646,31 @@ Triggers can be used to emulate Moose's type constraints, coercion and
 weakened reference features, but if you find yourself doing this frequently
 then you should consider upgrading to Moo or Moose.
 
-=back
+=item handles
 
-Note that currently all accessors are read-write by default and all unknown
-options are silently ignored.
+Delegated method calls.
 
-=head1 HAS DIFFERENCES
+    has wheels => (handles => [qw/ roll /]);
 
-Moos has a few differences from Moose, regarding it's accessor support (ie the
-'has' function).
+This accepts a hashref or arrayref, but not the other possibilities
+offered by L<Moose>.
 
-The supported options detailed above are about the same as Moose. All other
-arguments are currently ignored. Accessors are 'rw' by default, so you can
-just say:
+=item builder
 
-    has 'this';
-    has that => ();
+Specify the method name to generate a default value.
 
-Unlike the other Mo* modules, Moos also supports just specifying the default.
-If the number of arguments (after the name) is an odd number, then the first
-value is the default. The following forms are valid:
+    has this => ( builder => '_build_this' );
+    has that => ( builder => 1 );  # accept default name for method
+
+=item default
+
+Specify the sub to generate a default value.
+
+    has this => ( default => sub { 42 } );
+
+Moos provides a shortcut for specifying the default. If the number of
+arguments (after the name) is an odd number, then the first argument is
+the default. The following forms are valid:
 
     has a => 42;
     has b => 'string' => (lazy => 1);
@@ -716,7 +680,84 @@ value is the default. The following forms are valid:
 These all result in creating a Moos C<default> argument. If the default is an
 array or hash reference, a shallow copy is made.
 
-=head1 DEV OPTIONS
+=item clearer
+
+Creates a clearer method.
+
+    has this => ( clearer => "clear_this" );
+    has that => ( clearer => 1 );  # accept default name for method
+
+=item predicate
+
+Creates a predicate method, which can be used to check if the attribute is
+set or unset.
+
+    has this => ( predicate => "has_this" );
+    has that => ( predicate => 1 );  # accept default name for method
+
+=back
+
+=head2 Class and Object Methods
+
+=over
+
+=item new
+
+A constructor class method.
+
+    my $object = MyClass->new(this => 'nice', that => 2);
+
+=item BUILD
+
+Custom object construction. If you define BUILD, it is passed the value of the
+new object during construction. You can modify the object. Any value you
+return is ignored.
+
+    sub BUILD { my $self = shift; ... }
+
+=item BUILDARGS
+
+Custom constructor argument processing. If you define BUILDARGS, you can
+control how the constructor's arguments are built into the object hashref.
+
+    sub BUILDARGS { my ($class, @args) = @_; ... }
+
+=item dump
+
+Returns a textual dump of the object.
+
+=item meta
+
+Returns a Moos::Meta::Class object for the class. This has a very limited
+subset of L<Moose::Meta::Class>' functionality, including implementations
+of the following methods:
+C<name>,
+C<attribute_metaclass>,
+C<add_attribute>,
+C<superclasses>,
+C<linearized_isa>,
+C<new_object>,
+C<get_all_attributes>,
+C<get_attribute> and
+C<find_attribute_by_name>.
+
+The attribute introspection methods return L<Moos::Meta::Attribute> objects
+which provide a very limited subset of L<Moose::Meta::Attribute>'s
+functionality, including implementations of the following methods:
+C<name>,
+C<associated_class>,
+C<predicate>,
+C<clearer>,
+C<default>,
+C<builder>,
+C<trigger>,
+C<required>,
+C<lazy> and
+C<documentation>.
+
+=back
+
+=head2 Development Options
 
 Moos has a couple of builtin dev options. They are controlled by environment
 variables.
@@ -734,6 +775,12 @@ By setting the environment variable, Moos will export the L<XXX> debugging
 keywords.
 
 =back
+
+=head2 Need More Features?
+
+If you need roles, then Moos classes can consume L<Role::Tiny> roles.
+
+If you need method modifiers, then try L<Class::Method::Modifiers>.
 
 =head1 WHENCE
 
@@ -757,7 +804,7 @@ Later on, Toby added a bunch of low-cost but very handy features from Moose.
 In the end, I got Pegex to run even faster with Moos than it originally did
 with Mouse. I'll tell you my secret...
 
-B<<Accessors I<(usually)> do not need to be method calls.>>
+B<< Accessors I<(usually)> do not need to be method calls. >>
 
 Replace these:
 
@@ -771,16 +818,16 @@ with:
 
 And your code will be faster (and a bit uglier).
 
-The only time that you need to call an accessor method is when you are reading
-a property and it might invoke a C<lazy> C<builder>, C<default> or C<trigger>
-method. Otherwise you are just wasting time. At least with the minimal feature
-set offered by Moos.
+The only time that you need to call an accessor method is when you are
+accessing a property and it might invoke a C<lazy> C<builder>, C<default> or
+C<trigger> method. Otherwise you are just wasting time. At least with the
+minimal feature set offered by Moos.
 
 The PERL_MOOS_ACCESSOR_CALLS feature described above is for finding these
 method calls.
 
-Note that users of your module's accessor methods can still use the method
-calls like they would expect to.
+Note that third parties can still use your module's accessor methods like
+they would expect to.
 
 I'm sure I've missed some subtleties, and would be glad to hear opinions, but
 in the meantime I'm happy that my code is faster and pure Perl.
