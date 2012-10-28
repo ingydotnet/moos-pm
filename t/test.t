@@ -56,4 +56,22 @@ ok eval q{{
 	blessed(Fooble->new);
 }};
 
+ok not eval q{{
+	package Boos1;
+	use Moos;
+	has 42;
+}};
+
+ok not eval q{{
+	package Boos2;
+	use Moos;
+	has boo => (handles => [42]);
+}};
+
+ok not eval q{{
+	package Boos3;
+	use Moos;
+	has boo => (predicate => '');
+}};
+
 done_testing;

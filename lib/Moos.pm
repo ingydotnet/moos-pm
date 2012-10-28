@@ -4,6 +4,8 @@ use strict;
 use warnings;
 use 5.008;
 
+my $VALID_NAME = qr{ ^ [^\W0-9] \w* $ }ix;
+
 package Moos;
 
 use Scalar::Util;
@@ -337,6 +339,17 @@ sub BUILD {
     my $self      = shift;
     my $metaclass = $self->{associated_class} or return;
 
+    foreach (qw( name builder predicate clearer ))
+    {
+        next if !exists $self->{$_};
+        next if $self->{$_} =~ $VALID_NAME;
+        confess sprintf(
+            "invalid method name '%s' for %s",
+            $self->{$_},
+            $_ eq 'name' ? 'attribute' : $_,
+        );
+    }
+        
     unless ( $self->{_skip_setup} ) {
         $self->_setup_accessor($metaclass);
         $self->_setup_clearer($metaclass)    if $self->{clearer};
@@ -432,11 +445,10 @@ sub _setup_predicate {
     my $predicate = $self->{predicate} or return;
 
     if ($Moos::CAN_HAZ_XS) {
-        Class::XSAccessor->import(
+        return Class::XSAccessor->import(
             class      => $metaclass->{package},
             predicates => { $predicate => $name },
         );
-        return;
     }
 
     my $sub = eval qq{ sub { exists \$_[0]{'$name'} } };
@@ -457,6 +469,10 @@ sub _setup_delegation {
         if Scalar::Util::reftype($self->{handles}) eq 'ARRAY';
 
     while (my ($local, $remote) = each %map) {
+        for my $method ($local, $remote) {
+            next if $method =~ $VALID_NAME;
+            confess "invalid delegated method name '$method'";
+        }
         my $sub = eval qq{ sub { shift->{'$name'}->$remote(\@_) } };
         Moos::_export($metaclass->{package}, $local, $sub);
     }
