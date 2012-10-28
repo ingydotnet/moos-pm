@@ -2,9 +2,9 @@
 # are defined inside this one file.
 use strict;
 use warnings;
+use v5.10.0;
 
 package Moos;
-use v5.10.0;
 
 use mro;
 use Scalar::Util;
@@ -348,19 +348,11 @@ sub _setup_accessor
                 $type => [$name],
             );
         }
-        elsif ($self->{is} eq 'ro') {
-            Moos::_export(
-                $metaclass->{package},
-                $name,
-                eval qq{ sub { \$_[0]{'$name'} } },
-            );
-        }
         else {
-            Moos::_export(
-                $metaclass->{package},
-                $name,
-                eval qq{ sub { \$#_ ? \$_[0]{'$name'} = \$_[1] : \$_[0]{'$name'} } },
-            );
+            my $accessor = $self->{is} eq 'ro'
+                ? eval qq{ sub { \$_[0]{'$name'} } }
+                : eval qq{ sub { \$#_ ? \$_[0]{'$name'} = \$_[1] : \$_[0]{'$name'} } };
+            Moos::_export($metaclass->{package}, $name, $accessor);
         }
         return;
     }
@@ -589,11 +581,12 @@ L<Carp>) are exported to your namespace.
 =item has
 
 Accessor generator. Supports the C<is>, C<default>, C<build>, C<lazy>,
-C<clearer>, C<predicate>, C<required> and C<handles> options, described below.
+C<clearer>, C<predicate>, C<required>, C<handles> and C<trigger> options,
+described below.
 
     has this => ();
 
-NOTE: Class::XSACcessor will be used for simple accessors if it is installed.
+NOTE: Class::XSAccessor will be used for simple accessors if it is installed.
 This can be disabled by setting $Moos::CAN_HAZ_XS to false or by setting the
 PERL_MOOS_XS_DISABLE to true.
 
@@ -681,7 +674,7 @@ Moos has a few differences from Moose, regarding it's accessor support (ie the
 'has' function).
 
 The supported options detailed above are about the same as Moose. All other
-arguments are currently ignored. All generated accessors are 'rw'. So you can
+arguments are currently ignored. Accessors are 'rw' by default, so you can
 just say:
 
     has 'this';
@@ -701,7 +694,7 @@ array or hash reference, a shallow copy is made.
 
 =head1 DEV OPTIONS
 
-Moos has a couple builtin dev options. They are controlled by environment
+Moos has a couple of builtin dev options. They are controlled by environment
 variables.
 
 =over
@@ -765,7 +758,7 @@ method calls.
 Note that users of your module's accessor methods can still use the method
 calls like they would expect to.
 
-I'm sure I've missed some subtlties, and would be glad to hear opinions, but
+I'm sure I've missed some subtleties, and would be glad to hear opinions, but
 in the meantime I'm happy that my code is faster and pure Perl.
 
 =head1 SEE ALSO
