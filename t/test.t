@@ -3,8 +3,7 @@ use Test::More;
 package Foo;
 use Moos;
 
-has foo => ( default => sub {42} );
-has bar => ( default => sub {42} );
+has [qw/ foo bar /] => ( default => sub {42} );
 
 package Bar;
 use Moos;

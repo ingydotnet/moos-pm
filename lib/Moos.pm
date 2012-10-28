@@ -62,6 +62,7 @@ sub import {
 # Attribute generator
 sub has {
     my ($meta, $name) = splice(@_, 0, 2);
+    $name = [$name] unless ref $name;
     my %args;
 
     # Support 2-arg shorthand:
@@ -76,8 +77,8 @@ sub has {
     }
     %args = (%args, @_);
 
-    # Add attribute to meta class object
-    $meta->add_attribute($name => \%args);
+    # Add attributes to meta class object
+    $meta->add_attribute($_ => \%args) for @$name;
 }
 
 # Inheritance maker
