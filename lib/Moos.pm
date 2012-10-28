@@ -215,9 +215,8 @@ sub _construct_instance {
         next if exists $instance->{$name};
         if (exists $params->{$name}) {
             $instance->{$name} = $params->{$name};
-            next;
         }
-        if (not $attr->{lazy}) {
+        elsif (not $attr->{lazy}) {
             if (my $builder = $attr->{builder}) {
                 $builder = "_build_$name"
                     if defined $builder && $builder eq "1";
@@ -230,6 +229,10 @@ sub _construct_instance {
             if ($attr->{required} and not exists $instance->{$name}) {
                 confess "missing required attribute '$name'";
             }
+        }
+        # Triggers only fire for explicit assignment; not defaults.
+        if (exists $attr->{trigger} and exists $params->{$name}) {
+            $attr->{trigger}->($instance, $params->{$name});
         }
     }
     return $instance;
@@ -280,6 +283,7 @@ __PACKAGE__->meta->add_attribute($_, { is=>'ro' })
 sub _is_simple {
     not (  $_[0]{builder}
         || $_[0]{default}
+        || $_[0]{trigger}
         || $ENV{PERL_MOOS_ACCESSOR_CALLS}
     );
 }
@@ -304,6 +308,14 @@ sub BUILDARGS {
         if defined $args->{clearer} && $args->{clearer} eq "1";
     $args->{predicate} = $name =~ /^_/ ? "_has$name" : "has_$name"
         if defined $args->{predicate} && $args->{predicate} eq "1";
+    $args->{trigger} = do {
+            my ($trigger, $method) = "_trigger_$name";
+            sub {
+                $method ||= $_[0]->can($trigger)
+                    or confess "method $trigger does not exist for class ".ref($_[0]);
+                goto $method;
+            };
+        } if defined $args->{trigger} && $args->{trigger} eq "1";
     $args->{is} = 'rw'
         unless defined $args->{is};
 
@@ -357,6 +369,20 @@ sub _setup_accessor
         my $orig = $accessor;
         $accessor = sub {
             confess "cannot set value for read-only accessor '$name'" if @_ > 1;
+            goto $orig;
+        };
+    }
+    
+    if (exists $self->{trigger}) {
+        ref $self->{trigger} or confess "trigger for $name is not a reference";
+        my $orig = $accessor;
+        $accessor = sub {
+            if (@_ > 1) {
+                $self->{trigger}->(
+                    @_[0, 1],
+                    exists($_[0]{$name}) ? $_[0]{$name} : (),
+                );
+            }
             goto $orig;
         };
     }
@@ -612,6 +638,22 @@ Delegated method calls.
 This accepts a hashref or arrayref, but not the other possibilities
 offered by L<Moose>.
 
+=item trigger
+
+A coderef which will be called when the attribute is assigned to via a method
+call or the constructor. (But not when an attribute is implicitly given a
+value via a default or builder.) The coderef is called with the instance as
+the first parameter, the new value as the second parameter, and the old value
+(if any) as the third parameter.
+
+    has age => ( trigger => sub {
+        croak "non-numeric age" unless looks_like_number($_[1]);
+    } );
+
+Triggers can be used to emulate Moose's type constraints, coercion and
+weakened reference features, but if you find yourself doing this frequently
+then you should consider upgrading to Moo or Moose.
+
 =back
 
 Note that currently all accessors are read-write by default and all unknown
@@ -697,9 +739,9 @@ with:
 And your code will be faster (and a bit uglier).
 
 The only time that you need to call an accessor method is when you are reading
-a property and it might invoke a C<lazy> C<builder> or C<default> method.
-Otherwise you are just wasting time. At least with the minimal feature set
-offered by Moos.
+a property and it might invoke a C<lazy> C<builder>, C<default> or C<trigger>
+method. Otherwise you are just wasting time. At least with the minimal feature
+set offered by Moos.
 
 The PERL_MOOS_ACCESSOR_CALLS feature described above is for finding these
 method calls.
