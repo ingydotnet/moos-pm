@@ -2,13 +2,18 @@
 # are defined inside this one file.
 use strict;
 use warnings;
-use v5.10.0;
+use 5.008;
 
 package Moos;
 
-use mro;
 use Scalar::Util;
 use Carp qw(confess);
+
+if ($] >= 5.010) {
+    require mro;
+} else {
+    require MRO::Compat;
+}
 
 our $VERSION = '0.09';
 
@@ -141,7 +146,7 @@ sub initialize {
 
     # This is a tiny version of a Moose meta-class-object.
     # We really just need a place to keep the attributes.
-    return $meta_class_objects->{$package} //= do {
+    return $meta_class_objects->{$package} ||= do {
         bless {
             package => $package,
             # This isn't currently used but matches Moose and is cheap.
@@ -199,6 +204,12 @@ sub superclasses {
     return @{"$self->{package}\::ISA"};
 }
 
+sub linearized_isa {
+    my $self = shift;
+    my %seen;
+    return grep { not $seen{$_}++ } @{ mro::get_linear_isa($self->name) };
+}
+
 # This is where new objects are constructed. (Moose style)
 sub new_object {
     my ($self, $params) = @_;
@@ -243,7 +254,7 @@ sub _construct_instance {
 sub get_all_attributes {
     my $self = shift;
     my (@attrs, %attrs);
-    for my $package (@{mro::get_linear_isa($self->name)}) {
+    for my $package ($self->linearized_isa) {
         my $meta = Moos::Meta::Class->initialize($package);
         for my $attr (@{$meta->{_attributes}}) {
             my $name = $attr->{name};
@@ -343,18 +354,17 @@ sub _setup_accessor
     if ($self->_is_simple) {
         if ($Moos::CAN_HAZ_XS) {
             my $type = $self->{is} eq 'ro' ? 'getters' : 'accessors';
-            Class::XSAccessor->import(
+            return Class::XSAccessor->import(
                 class => $metaclass->{package},
                 $type => [$name],
             );
         }
-        else {
+        elsif ($] >= 5.010) {
             my $accessor = $self->{is} eq 'ro'
                 ? eval qq{ sub { \$_[0]{'$name'} } }
                 : eval qq{ sub { \$#_ ? \$_[0]{'$name'} = \$_[1] : \$_[0]{'$name'} } };
-            Moos::_export($metaclass->{package}, $name, $accessor);
+            return Moos::_export($metaclass->{package}, $name, $accessor);
         }
-        return;
     }
 
     my ($builder, $default) = map $self->{$_}, qw(builder default);
@@ -372,7 +382,7 @@ sub _setup_accessor
         sub {
             $#_ ? $_[0]{$name} = $_[1] : $_[0]{$name};
         };
-
+    
     if ($self->{is} eq 'ro') {
         my $orig = $accessor;
         $accessor = sub {
@@ -473,9 +483,7 @@ sub BUILDARGS {
 sub BUILDALL {
     return unless $_[0]->can('BUILD');
     my ($self, $params) = @_;
-    for my $package (
-        reverse @{mro::get_linear_isa(Scalar::Util::blessed($self))}
-    ) {
+    for my $package (reverse $self->meta->linearized_isa) {
         no strict 'refs';
         if (defined &{"$package\::BUILD"}) {
             &{"$package\::BUILD"}($self, $params);
