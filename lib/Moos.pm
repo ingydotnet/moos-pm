@@ -42,10 +42,10 @@ sub import {
     my $meta = $metaclass->initialize($package, %args);
 
     # Make calling class inherit from Moos::Object by default
-    my $baseclass =
-        delete $args{base_class}
-        || $class->default_base_class;
-    extends($meta, $baseclass);
+    my $baseclass = exists $args{base_class}
+        ? delete $args{base_class}
+        : $class->default_base_class;
+    extends($meta, $baseclass) if defined $baseclass;
 
     # Export the 'has' and 'extends' helper functions
     _export($package, has => \&has, $meta);
