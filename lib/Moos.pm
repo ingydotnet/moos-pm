@@ -340,12 +340,28 @@ sub _setup_accessor
     my ($self, $metaclass) = @_;
     my $name = $self->{name};
 
-    if ($self->_is_simple and $Moos::CAN_HAZ_XS) {
-        my $type = $self->{is} eq 'ro' ? 'getters' : 'accessors';
-        Class::XSAccessor->import(
-            class => $metaclass->{package},
-            $type => [$name],
-        );
+    if ($self->_is_simple) {
+        if ($Moos::CAN_HAZ_XS) {
+            my $type = $self->{is} eq 'ro' ? 'getters' : 'accessors';
+            Class::XSAccessor->import(
+                class => $metaclass->{package},
+                $type => [$name],
+            );
+        }
+        elsif ($self->{is} eq 'ro') {
+            Moos::_export(
+                $metaclass->{package},
+                $name,
+                eval qq{ sub { \$_[0]{'$name'} } },
+            );
+        }
+        else {
+            Moos::_export(
+                $metaclass->{package},
+                $name,
+                eval qq{ sub { \$#_ ? \$_[0]{'$name'} = \$_[1] : \$_[0]{'$name'} } },
+            );
+        }
         return;
     }
 
@@ -373,7 +389,7 @@ sub _setup_accessor
         };
     }
     
-    if (exists $self->{trigger}) {
+    elsif (exists $self->{trigger}) {
         ref $self->{trigger} or confess "trigger for $name is not a reference";
         my $orig = $accessor;
         $accessor = sub {
@@ -402,7 +418,7 @@ sub _setup_clearer {
     my $name = $self->{name};
 
     my $clearer = $self->{clearer} or return;
-    my $sub = sub { delete $_[0]{$name} };
+    my $sub = eval qq{ sub { delete \$_[0]{'$name'} } };
     Moos::_export($metaclass->{package}, $clearer, $sub);
     return;
 }
@@ -421,7 +437,7 @@ sub _setup_predicate {
         return;
     }
 
-    my $sub = sub { exists $_[0]{$name} };
+    my $sub = eval qq{ sub { exists \$_[0]{'$name'} } };
     Moos::_export($metaclass->{package}, $predicate, $sub);
     return;
 }
@@ -439,7 +455,7 @@ sub _setup_delegation {
         if Scalar::Util::reftype($self->{handles}) eq 'ARRAY';
 
     while (my ($local, $remote) = each %map) {
-        my $sub = sub { shift->{$name}->$remote(@_) };
+        my $sub = eval qq{ sub { shift->{'$name'}->$remote(\@_) } };
         Moos::_export($metaclass->{package}, $local, $sub);
     }
     return;
