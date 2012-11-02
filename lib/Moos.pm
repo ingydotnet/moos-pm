@@ -779,7 +779,27 @@ keywords.
 
 =head2 Need More Features?
 
-If you need roles, then Moos classes can consume L<Role::Tiny> roles.
+If you need roles, then Moos classes can consume L<Role::Tiny> and
+L<Moo::Role> roles. The L<Role::Tiny::With> module provides a suitable
+C<with> function.
+
+    {
+        package Local::Class;
+        use Moos;
+        use Role::Tiny::With;
+        with "Local::Role";
+        ...;
+    }
+
+Moos classes can also consume L<Moose::Role> roles, though not as cleanly.
+
+    {
+        package Local::Class;
+        use Moos;
+        use Moose::Util;
+        Moose::Util::apply_all_roles(__PACKAGE__, "Local::Role");
+        ...;
+    }
 
 If you need method modifiers, then try L<Class::Method::Modifiers>.
 
