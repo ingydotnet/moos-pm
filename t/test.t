@@ -3,8 +3,7 @@ use Test::More;
 package Foo;
 use Moos;
 
-has foo => ( default => sub {42} );
-has bar => ( default => sub {42} );
+has [qw/ foo bar /] => ( default => sub {42} );
 
 package Bar;
 use Moos;
@@ -54,6 +53,24 @@ ok eval q{{
 	use Moos;
 	__PACKAGE__->can('confess') and __PACKAGE__->can('blessed');
 	blessed(Fooble->new);
+}};
+
+ok not eval q{{
+	package Boos1;
+	use Moos;
+	has 42;
+}};
+
+ok not eval q{{
+	package Boos2;
+	use Moos;
+	has boo => (handles => [42]);
+}};
+
+ok not eval q{{
+	package Boos3;
+	use Moos;
+	has boo => (predicate => '');
 }};
 
 done_testing;

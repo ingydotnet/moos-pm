@@ -2,13 +2,20 @@
 # are defined inside this one file.
 use strict;
 use warnings;
+use 5.008;
+
+my $VALID_NAME = qr{ ^ [^\W0-9] \w* $ }ix;
 
 package Moos;
-use v5.10.0;
 
-use mro;
 use Scalar::Util;
 use Carp qw(confess);
+
+if ($] >= 5.010) {
+    require mro;
+} else {
+    require MRO::Compat;
+}
 
 our $VERSION = '0.09';
 
@@ -35,10 +42,10 @@ sub import {
     my $meta = $metaclass->initialize($package, %args);
 
     # Make calling class inherit from Moos::Object by default
-    my $baseclass =
-        delete $args{base_class}
-        || $class->default_base_class;
-    extends($meta, $baseclass);
+    my $baseclass = exists $args{base_class}
+        ? delete $args{base_class}
+        : $class->default_base_class;
+    extends($meta, $baseclass) if defined $baseclass;
 
     # Export the 'has' and 'extends' helper functions
     _export($package, has => \&has, $meta);
@@ -55,6 +62,7 @@ sub import {
 # Attribute generator
 sub has {
     my ($meta, $name) = splice(@_, 0, 2);
+    $name = [$name] unless ref $name;
     my %args;
 
     # Support 2-arg shorthand:
@@ -69,8 +77,8 @@ sub has {
     }
     %args = (%args, @_);
 
-    # Add attribute to meta class object
-    $meta->add_attribute($name => \%args);
+    # Add attributes to meta class object
+    $meta->add_attribute($_ => \%args) for @$name;
 }
 
 # Inheritance maker
@@ -141,7 +149,7 @@ sub initialize {
 
     # This is a tiny version of a Moose meta-class-object.
     # We really just need a place to keep the attributes.
-    return $meta_class_objects->{$package} //= do {
+    return $meta_class_objects->{$package} ||= do {
         bless {
             package => $package,
             # This isn't currently used but matches Moose and is cheap.
@@ -199,6 +207,12 @@ sub superclasses {
     return @{"$self->{package}\::ISA"};
 }
 
+sub linearized_isa {
+    my $self = shift;
+    my %seen;
+    return grep { not $seen{$_}++ } @{ mro::get_linear_isa($self->name) };
+}
+
 # This is where new objects are constructed. (Moose style)
 sub new_object {
     my ($self, $params) = @_;
@@ -215,9 +229,8 @@ sub _construct_instance {
         next if exists $instance->{$name};
         if (exists $params->{$name}) {
             $instance->{$name} = $params->{$name};
-            next;
         }
-        if (not $attr->{lazy}) {
+        elsif (not $attr->{lazy}) {
             if (my $builder = $attr->{builder}) {
                 $builder = "_build_$name"
                     if defined $builder && $builder eq "1";
@@ -231,6 +244,10 @@ sub _construct_instance {
                 confess "missing required attribute '$name'";
             }
         }
+        # Triggers only fire for explicit assignment; not defaults.
+        if (exists $attr->{trigger} and exists $params->{$name}) {
+            $attr->{trigger}->($instance, $params->{$name});
+        }
     }
     return $instance;
 }
@@ -240,7 +257,7 @@ sub _construct_instance {
 sub get_all_attributes {
     my $self = shift;
     my (@attrs, %attrs);
-    for my $package (@{mro::get_linear_isa($self->name)}) {
+    for my $package ($self->linearized_isa) {
         my $meta = Moos::Meta::Class->initialize($package);
         for my $attr (@{$meta->{_attributes}}) {
             my $name = $attr->{name};
@@ -280,6 +297,7 @@ __PACKAGE__->meta->add_attribute($_, { is=>'ro' })
 sub _is_simple {
     not (  $_[0]{builder}
         || $_[0]{default}
+        || $_[0]{trigger}
         || $ENV{PERL_MOOS_ACCESSOR_CALLS}
     );
 }
@@ -304,6 +322,14 @@ sub BUILDARGS {
         if defined $args->{clearer} && $args->{clearer} eq "1";
     $args->{predicate} = $name =~ /^_/ ? "_has$name" : "has_$name"
         if defined $args->{predicate} && $args->{predicate} eq "1";
+    $args->{trigger} = do {
+            my ($trigger, $method) = "_trigger_$name";
+            sub {
+                $method ||= $_[0]->can($trigger)
+                    or confess "method $trigger does not exist for class ".ref($_[0]);
+                goto $method;
+            };
+        } if defined $args->{trigger} && $args->{trigger} eq "1";
     $args->{is} = 'rw'
         unless defined $args->{is};
 
@@ -314,6 +340,17 @@ sub BUILD {
     my $self      = shift;
     my $metaclass = $self->{associated_class} or return;
 
+    foreach (qw( name builder predicate clearer ))
+    {
+        next if !exists $self->{$_};
+        next if $self->{$_} =~ $VALID_NAME;
+        confess sprintf(
+            "invalid method name '%s' for %s",
+            $self->{$_},
+            $_ eq 'name' ? 'attribute' : $_,
+        );
+    }
+        
     unless ( $self->{_skip_setup} ) {
         $self->_setup_accessor($metaclass);
         $self->_setup_clearer($metaclass)    if $self->{clearer};
@@ -328,13 +365,20 @@ sub _setup_accessor
     my ($self, $metaclass) = @_;
     my $name = $self->{name};
 
-    if ($self->_is_simple and $Moos::CAN_HAZ_XS) {
-        my $type = $self->{is} eq 'ro' ? 'getters' : 'accessors';
-        Class::XSAccessor->import(
-            class => $metaclass->{package},
-            $type => [$name],
-        );
-        return;
+    if ($self->_is_simple) {
+        if ($Moos::CAN_HAZ_XS) {
+            my $type = $self->{is} eq 'ro' ? 'getters' : 'accessors';
+            return Class::XSAccessor->import(
+                class => $metaclass->{package},
+                $type => [$name],
+            );
+        }
+        else {
+            my $accessor = $self->{is} eq 'ro'
+                ? eval qq{ sub { Carp::confess("cannot set value for read-only accessor '$name'") if \@_ > 1; \$_[0]{'$name'} } }
+                : eval qq{ sub { \$#_ ? \$_[0]{'$name'} = \$_[1] : \$_[0]{'$name'} } };
+            return Moos::_export($metaclass->{package}, $name, $accessor);
+        }
     }
 
     my ($builder, $default) = map $self->{$_}, qw(builder default);
@@ -352,11 +396,25 @@ sub _setup_accessor
         sub {
             $#_ ? $_[0]{$name} = $_[1] : $_[0]{$name};
         };
-
+    
     if ($self->{is} eq 'ro') {
         my $orig = $accessor;
         $accessor = sub {
             confess "cannot set value for read-only accessor '$name'" if @_ > 1;
+            goto $orig;
+        };
+    }
+    
+    elsif (exists $self->{trigger}) {
+        ref $self->{trigger} or confess "trigger for $name is not a reference";
+        my $orig = $accessor;
+        $accessor = sub {
+            if (@_ > 1) {
+                $self->{trigger}->(
+                    @_[0, 1],
+                    exists($_[0]{$name}) ? $_[0]{$name} : (),
+                );
+            }
             goto $orig;
         };
     }
@@ -376,7 +434,7 @@ sub _setup_clearer {
     my $name = $self->{name};
 
     my $clearer = $self->{clearer} or return;
-    my $sub = sub { delete $_[0]{$name} };
+    my $sub = eval qq{ sub { delete \$_[0]{'$name'} } };
     Moos::_export($metaclass->{package}, $clearer, $sub);
     return;
 }
@@ -388,14 +446,13 @@ sub _setup_predicate {
     my $predicate = $self->{predicate} or return;
 
     if ($Moos::CAN_HAZ_XS) {
-        Class::XSAccessor->import(
+        return Class::XSAccessor->import(
             class      => $metaclass->{package},
             predicates => { $predicate => $name },
         );
-        return;
     }
 
-    my $sub = sub { exists $_[0]{$name} };
+    my $sub = eval qq{ sub { exists \$_[0]{'$name'} } };
     Moos::_export($metaclass->{package}, $predicate, $sub);
     return;
 }
@@ -413,7 +470,11 @@ sub _setup_delegation {
         if Scalar::Util::reftype($self->{handles}) eq 'ARRAY';
 
     while (my ($local, $remote) = each %map) {
-        my $sub = sub { shift->{$name}->$remote(@_) };
+        for my $method ($local, $remote) {
+            next if $method =~ $VALID_NAME;
+            confess "invalid delegated method name '$method'";
+        }
+        my $sub = eval qq{ sub { shift->{'$name'}->$remote(\@_) } };
         Moos::_export($metaclass->{package}, $local, $sub);
     }
     return;
@@ -439,9 +500,7 @@ sub BUILDARGS {
 sub BUILDALL {
     return unless $_[0]->can('BUILD');
     my ($self, $params) = @_;
-    for my $package (
-        reverse @{mro::get_linear_isa(Scalar::Util::blessed($self))}
-    ) {
+    for my $package (reverse $self->meta->linearized_isa) {
         no strict 'refs';
         if (defined &{"$package\::BUILD"}) {
             &{"$package\::BUILD"}($self, $params);
@@ -507,15 +566,18 @@ what it does).
 =head1 FEATURES
 
 Here's a quick list of the L<Moose> compatible features that are supported by
-L<Moos>:
+L<Moos>.
 
-=over
-
-=item strict / warnings
+=head2 strict / warnings
 
 Turns on C<strict> and C<warnings> for you.
 
-=item extends
+=head2 Helpful exports
+
+The ever useful C<blessed> (from L<Scalar::Util>) and C<confess> (from
+L<Carp>) are exported to your namespace.
+
+=head2 extends
 
 For inheritance. C<Moos::Object> is the default base class.
 
@@ -525,35 +587,20 @@ For inheritance. C<Moos::Object> is the default base class.
 Supports multiple inheritance, by allowing multiple classes on a single
 invocation.
 
-=item new
-
-A constructor class method.
-
-    my $object = MyClass->new(this => 'nice', that => 2);
-
-=item BUILD
-
-Custom object construction. If you define BUILD, it is passed the value of the
-new object during construction. You can modify the object. Any value you
-return is ignored.
-
-    sub BUILD { my $self = shift; ... }
-
-=item Helpful exports
-
-The ever useful C<blessed> (from L<Scalar::Util>) and C<confess> (from
-L<Carp>) are exported to your namespace.
-
-=item has
+=head2 has
 
 Accessor generator. Supports the C<is>, C<default>, C<build>, C<lazy>,
-C<clearer>, C<predicate>, C<required> and C<handles> options, described below.
+C<clearer>, C<predicate>, C<required>, C<handles> and C<trigger> options,
+described below. The supported options are about the same as Moose. Other
+arguments (e.g. C<isa> and C<coerce>) are currently ignored. 
 
     has this => ();
 
-NOTE: Class::XSACcessor will be used for simple accessors if it is installed.
+NOTE: Class::XSAccessor will be used for simple accessors if it is installed.
 This can be disabled by setting $Moos::CAN_HAZ_XS to false or by setting the
 PERL_MOOS_XS_DISABLE to true.
+
+=over
 
 =item is
 
@@ -561,12 +608,53 @@ Specify which type of attribute accessor to provide. The default is "rw",
 a read-write accessor. Read-only "ro" accessors are also supported.
 
     has this => ( is => "ro" );
+    has 'this';                   # read-write
+    has that => ();               # read-write
 
-=item default
+Unlike Moose, Moos cannot generate differently named getters and setters.
+If you want your setter named something different (e.g. a private method),
+then you could do something like:
 
-Specify the sub to generate a default value.
+    has this => ( is => 'ro' );
+    sub _set_this { $_[0]{this} = $_[1] }
 
-    has this => ( default => sub { 42 } );
+=item required
+
+Require that a value for the attribute be provided to the constructor or
+generated during object construction.
+
+    has this => ( required => 1 );
+
+=item lazy
+
+Don't generate defaults during object construction.
+
+    has this => ( builder => '_build_this', lazy => 1 );
+
+=item trigger
+
+A coderef which will be called when the attribute is assigned to via a method
+call or the constructor. (But not when an attribute is implicitly given a
+value via a default or builder.) The coderef is called with the instance as
+the first parameter, the new value as the second parameter, and the old value
+(if any) as the third parameter.
+
+    has age => ( trigger => sub {
+        croak "non-numeric age" unless looks_like_number($_[1]);
+    } );
+
+Triggers can be used to emulate Moose's type constraints, coercion and
+weakened reference features, but if you find yourself doing this frequently
+then you should consider upgrading to Moo or Moose.
+
+=item handles
+
+Delegated method calls.
+
+    has wheels => (handles => [qw/ roll /]);
+
+This accepts a hashref or arrayref, but not the other possibilities
+offered by L<Moose>.
 
 =item builder
 
@@ -575,11 +663,23 @@ Specify the method name to generate a default value.
     has this => ( builder => '_build_this' );
     has that => ( builder => 1 );  # accept default name for method
 
-=item lazy
+=item default
 
-Don't generate defaults during object construction.
+Specify the sub to generate a default value.
 
-    has this => ( builder => '_build_this', lazy => 1 );
+    has this => ( default => sub { 42 } );
+
+Moos provides a shortcut for specifying the default. If the number of
+arguments (after the name) is an odd number, then the first argument is
+the default. The following forms are valid:
+
+    has a => 42;
+    has b => 'string' => (lazy => 1);
+    has c => {};
+    has d => [1, 2, 3, 4];
+
+These all result in creating a Moos C<default> argument. If the default is an
+array or hash reference, a shallow copy is made.
 
 =item clearer
 
@@ -596,54 +696,71 @@ set or unset.
     has this => ( predicate => "has_this" );
     has that => ( predicate => 1 );  # accept default name for method
 
-=item required
+=back
 
-Require that a value for the attribute be provided to the constructor or
-generated during object construction.
+=head2 Class and Object Methods
 
-    has this => ( required => 1 );
+=over
 
-=item handles
+=item new
 
-Delegated method calls.
+A constructor class method.
 
-    has wheels => (handles => [qw/ roll /]);
+    my $object = MyClass->new(this => 'nice', that => 2);
 
-This accepts a hashref or arrayref, but not the other possibilities
-offered by L<Moose>.
+=item BUILD
+
+Custom object construction. If you define BUILD, it is passed the value of the
+new object during construction. You can modify the object. Any value you
+return is ignored.
+
+    sub BUILD { my $self = shift; ... }
+
+=item BUILDARGS
+
+Custom constructor argument processing. If you define BUILDARGS, you can
+control how the constructor's arguments are built into the object hashref.
+
+    sub BUILDARGS { my ($class, @args) = @_; ... }
+
+=item dump
+
+Returns a textual dump of the object.
+
+=item meta
+
+Returns a Moos::Meta::Class object for the class. This has a very limited
+subset of L<Moose::Meta::Class>' functionality, including implementations
+of the following methods:
+C<name>,
+C<attribute_metaclass>,
+C<add_attribute>,
+C<superclasses>,
+C<linearized_isa>,
+C<new_object>,
+C<get_all_attributes>,
+C<get_attribute> and
+C<find_attribute_by_name>.
+
+The attribute introspection methods return L<Moos::Meta::Attribute> objects
+which provide a very limited subset of L<Moose::Meta::Attribute>'s
+functionality, including implementations of the following methods:
+C<name>,
+C<associated_class>,
+C<predicate>,
+C<clearer>,
+C<default>,
+C<builder>,
+C<trigger>,
+C<required>,
+C<lazy> and
+C<documentation>.
 
 =back
 
-Note that currently all accessors are read-write by default and all unknown
-options are silently ignored.
+=head2 Development Options
 
-=head1 HAS DIFFERENCES
-
-Moos has a few differences from Moose, regarding it's accessor support (ie the
-'has' function).
-
-The supported options detailed above are about the same as Moose. All other
-arguments are currently ignored. All generated accessors are 'rw'. So you can
-just say:
-
-    has 'this';
-    has that => ();
-
-Unlike the other Mo* modules, Moos also supports just specifying the default.
-If the number of arguments (after the name) is an odd number, then the first
-value is the default. The following forms are valid:
-
-    has a => 42;
-    has b => 'string' => (lazy => 1);
-    has c => {};
-    has d => [1, 2, 3, 4];
-
-These all result in creating a Moos C<default> argument. If the default is an
-array or hash reference, a shallow copy is made.
-
-=head1 DEV OPTIONS
-
-Moos has a couple builtin dev options. They are controlled by environment
+Moos has a couple of builtin dev options. They are controlled by environment
 variables.
 
 =over
@@ -659,6 +776,12 @@ By setting the environment variable, Moos will export the L<XXX> debugging
 keywords.
 
 =back
+
+=head2 Need More Features?
+
+If you need roles, then Moos classes can consume L<Role::Tiny> roles.
+
+If you need method modifiers, then try L<Class::Method::Modifiers>.
 
 =head1 WHENCE
 
@@ -682,7 +805,7 @@ Later on, Toby added a bunch of low-cost but very handy features from Moose.
 In the end, I got Pegex to run even faster with Moos than it originally did
 with Mouse. I'll tell you my secret...
 
-B<<Accessors I<(usually)> do not need to be method calls.>>
+B<< Accessors I<(usually)> do not need to be method calls. >>
 
 Replace these:
 
@@ -696,18 +819,18 @@ with:
 
 And your code will be faster (and a bit uglier).
 
-The only time that you need to call an accessor method is when you are reading
-a property and it might invoke a C<lazy> C<builder> or C<default> method.
-Otherwise you are just wasting time. At least with the minimal feature set
-offered by Moos.
+The only time that you need to call an accessor method is when you are
+accessing a property and it might invoke a C<lazy> C<builder>, C<default> or
+C<trigger> method. Otherwise you are just wasting time. At least with the
+minimal feature set offered by Moos.
 
 The PERL_MOOS_ACCESSOR_CALLS feature described above is for finding these
 method calls.
 
-Note that users of your module's accessor methods can still use the method
-calls like they would expect to.
+Note that third parties can still use your module's accessor methods like
+they would expect to.
 
-I'm sure I've missed some subtlties, and would be glad to hear opinions, but
+I'm sure I've missed some subtleties, and would be glad to hear opinions, but
 in the meantime I'm happy that my code is faster and pure Perl.
 
 =head1 SEE ALSO
