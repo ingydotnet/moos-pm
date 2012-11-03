@@ -13,7 +13,8 @@ use Carp qw(confess);
 
 if ($] >= 5.010) {
     require mro;
-} else {
+}
+else {
     require MRO::Compat;
 }
 
@@ -140,8 +141,8 @@ sub attribute_metaclass {
 }
 __PACKAGE__->meta->add_attribute(
     attribute_metaclass => {
-        is          => 'ro',
-        default     => \&default_attribute_metaclass,
+        is => 'ro',
+        default => \&default_attribute_metaclass,
         _skip_setup => 1,
     },
 );
@@ -177,7 +178,7 @@ sub add_attribute {
     push @{$self->{_attributes}}, (
         $self->{attributes}{$name} =
         $self->attribute_metaclass->new(
-            name             => $name,
+            name => $name,
             associated_class => $self,
             %args,
         )
@@ -311,7 +312,7 @@ sub _is_simple {
 # Not sure why it is necessary to override &new here...
 sub new {
     my $class = shift;
-    my $self  = bless $class->BUILDARGS(@_) => $class;
+    my $self = bless $class->BUILDARGS(@_) => $class;
     $self->Moos::Object::BUILDALL;
     return $self;
 }
@@ -343,7 +344,7 @@ sub BUILDARGS {
 }
 
 sub BUILD {
-    my $self      = shift;
+    my $self = shift;
     my $metaclass = $self->{associated_class} or return;
 
     foreach (qw( name builder predicate clearer ))
@@ -453,7 +454,7 @@ sub _setup_predicate {
 
     if ($Moos::CAN_HAZ_XS) {
         return Class::XSAccessor->import(
-            class      => $metaclass->{package},
+            class => $metaclass->{package},
             predicates => { $predicate => $name },
         );
     }
@@ -523,8 +524,7 @@ sub dump {
     Data::Dumper::Dumper $self;
 }
 
-# Use to retrieve the (rather useless) Moos meta-class-object. Hey it's a
-# start. :)
+# Retrieve the Moos meta-class-object.
 sub meta {
     Moos::Meta::Class->initialize(Scalar::Util::blessed($_[0]) || $_[0]);
 }
