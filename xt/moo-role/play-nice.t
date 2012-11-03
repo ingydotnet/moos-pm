@@ -14,7 +14,6 @@ BEGIN {
 {
 	package Local::Class;
 	use Moos;
-	use Role::Tiny::With qw(with);
 	has 'bar';
 	with qw( Local::Role );
 }

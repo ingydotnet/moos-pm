@@ -17,7 +17,7 @@ if ($] >= 5.010) {
     require MRO::Compat;
 }
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 our $CAN_HAZ_XS =
     !$ENV{PERL_MOOS_XS_DISABLE} &&
@@ -47,9 +47,10 @@ sub import {
         : $class->default_base_class;
     extends($meta, $baseclass) if defined $baseclass;
 
-    # Export the 'has' and 'extends' helper functions
+    # Export the 'has', 'extends', and 'with' helper functions
     _export($package, has => \&has, $meta);
     _export($package, extends => \&extends, $meta);
+    _export($package, with => \&with);
 
     # Export the 'blessed' and 'confess' functions
     _export($package, blessed => \&Scalar::Util::blessed);
@@ -86,6 +87,11 @@ sub extends {
     my ($meta, @parent) = @_;
     eval "require $_" for @parent;
     $meta->superclasses(@parent);
+}
+
+sub with {
+    require Role::Tiny;
+    Role::Tiny->apply_roles_to_package(scalar(caller), @_);
 }
 
 # Use this for exports and meta-exports
@@ -350,7 +356,7 @@ sub BUILD {
             $_ eq 'name' ? 'attribute' : $_,
         );
     }
-        
+
     unless ( $self->{_skip_setup} ) {
         $self->_setup_accessor($metaclass);
         $self->_setup_clearer($metaclass)    if $self->{clearer};
@@ -396,7 +402,7 @@ sub _setup_accessor
         sub {
             $#_ ? $_[0]{$name} = $_[1] : $_[0]{$name};
         };
-    
+
     if ($self->{is} eq 'ro') {
         my $orig = $accessor;
         $accessor = sub {
@@ -404,7 +410,7 @@ sub _setup_accessor
             goto $orig;
         };
     }
-    
+
     elsif (exists $self->{trigger}) {
         ref $self->{trigger} or confess "trigger for $name is not a reference";
         my $orig = $accessor;
@@ -527,16 +533,17 @@ sub meta {
 
 =encoding utf8
 
-=head1 NAME
+=head1 Name
 
 Moos - Moo s{imple,peedy,ingle}
 
-=head1 SYNOPSIS
+=head1 Synopsis
 
     package Foos;
     use Moos;
 
     extends 'Boos';
+    with 'Cloos';
 
     has this => ();
     has that => 42;
@@ -556,14 +563,14 @@ Moos - Moo s{imple,peedy,ingle}
         return {%munged_args};
     }
 
-=head1 DESCRIPTION
+=head1 Description
 
 Moos completes the M to Moose sequence of Perl OO modules.
 
 This one is pure Perl, no dependencies, single file and Moose compatible (for
 what it does).
 
-=head1 FEATURES
+=head1 Features
 
 Here's a quick list of the L<Moose> compatible features that are supported by
 L<Moos>.
@@ -587,12 +594,19 @@ For inheritance. C<Moos::Object> is the default base class.
 Supports multiple inheritance, by allowing multiple classes on a single
 invocation.
 
+=head2 with
+
+Moos can consume roles using the C<with> keyword. Using this feature requires
+Role::Tiny to be installed.
+
+    with 'ThisClass', 'ThatClass';
+
 =head2 has
 
 Accessor generator. Supports the C<is>, C<default>, C<build>, C<lazy>,
 C<clearer>, C<predicate>, C<required>, C<handles> and C<trigger> options,
 described below. The supported options are about the same as Moose. Other
-arguments (e.g. C<isa> and C<coerce>) are currently ignored. 
+arguments (e.g. C<isa> and C<coerce>) are currently ignored.
 
     has this => ();
 
@@ -758,6 +772,32 @@ C<documentation>.
 
 =back
 
+=head2 Roles
+
+If you need roles, then Moos classes can consume L<Role::Tiny> and L<Moo::Role>
+roles. (Moos provides a C<with> command that uses L<Role::Tiny to do the work.)
+
+    {
+        package Local::Class;
+        use Moos;
+        with "Local::Role";
+        ...;
+    }
+
+Moos classes can also consume L<Moose::Role> roles, though not as cleanly.
+
+    {
+        package Local::Class;
+        use Moos;
+        use Moose::Util;
+        Moose::Util::apply_all_roles(__PACKAGE__, "Local::Role");
+        ...;
+    }
+
+=head2 Method Modifiers
+
+If you need method modifiers, then try L<Class::Method::Modifiers>.
+
 =head2 Development Options
 
 Moos has a couple of builtin dev options. They are controlled by environment
@@ -777,33 +817,7 @@ keywords.
 
 =back
 
-=head2 Need More Features?
-
-If you need roles, then Moos classes can consume L<Role::Tiny> and
-L<Moo::Role> roles. The L<Role::Tiny::With> module provides a suitable
-C<with> function.
-
-    {
-        package Local::Class;
-        use Moos;
-        use Role::Tiny::With;
-        with "Local::Role";
-        ...;
-    }
-
-Moos classes can also consume L<Moose::Role> roles, though not as cleanly.
-
-    {
-        package Local::Class;
-        use Moos;
-        use Moose::Util;
-        Moose::Util::apply_all_roles(__PACKAGE__, "Local::Role");
-        ...;
-    }
-
-If you need method modifiers, then try L<Class::Method::Modifiers>.
-
-=head1 WHENCE
+=head1 Whence Moos
 
 I(ngy) created Moos during L<Pegex> development. Pegex uses a clone of Moos
 called L<Pegex::Base>.
@@ -818,9 +832,13 @@ this broke my toolchain (TestML, Module::Install, etc).
 I tried to inline L<Moo> into one file but failed, and ended up with this.
 I've shared Pegex::Base as L<Moos> in case any other projects want it.
 
-Later on, Toby added a bunch of low-cost but very handy features from Moose.
+Later on, Toby Inkster added a bunch of low-cost but very handy features from
+Moose.
 
-=head1 ON SPEED
+The name L<Moos> was chosen because it was the only name left between M and
+Moose. (Thus adding to the epic confusion that we embrace as Perl Mongers! :)
+
+=head1 On Speed
 
 In the end, I got Pegex to run even faster with Moos than it originally did
 with Mouse. I'll tell you my secret...
@@ -853,7 +871,7 @@ they would expect to.
 I'm sure I've missed some subtleties, and would be glad to hear opinions, but
 in the meantime I'm happy that my code is faster and pure Perl.
 
-=head1 SEE ALSO
+=head1 See Also
 
 =over
 
@@ -873,13 +891,13 @@ in the meantime I'm happy that my code is faster and pure Perl.
 
 =back
 
-=head1 AUTHORS
+=head1 Authors
 
 Ingy döt Net <ingy@cpan.org>
 
 Toby Inkster <tobyink@cpan.org>
 
-=head1 COPYRIGHT AND LICENSE
+=head1 Copyright and License
 
 Copyright (c) 2012. Ingy döt Net.
 
