@@ -557,6 +557,23 @@ sub meta {
     Moos::Meta::Class->initialize(Scalar::Util::blessed($_[0]) || $_[0]);
 }
 
+sub does {
+    my ($self, $role) = @_;
+    return 1
+        if Role::Tiny::does_role($self, $role);
+    return 1
+        if UNIVERSAL::can('Moose::Util', 'can')
+        && Moose::Util->can('does_role')
+        && Moose::Util::does_role($self, $role);
+    return 0;
+}
+
+sub DOES {
+    my ($self, $role) = @_;
+    my $universal_does = UNIVERSAL->can('DOES') || UNIVERSAL->can('isa');
+    $self->does($role) or $self->$universal_does($role);
+}
+
 1;
 
 =encoding utf8
@@ -798,6 +815,13 @@ C<required>,
 C<lazy> and
 C<documentation>.
 
+=item does / DOES
+
+Methods to check whether the class/object performs a particular
+role. The methods differ in that C<does> checks roles only in
+the Moose/Moo/Role::Tiny sense; C<DOES> also takes into account
+L<UNIVERSAL>::DOES.
+
 =back
 
 =head2 Roles
@@ -814,8 +838,7 @@ C<with> command that uses L<Role::Tiny> to do the work.)
     }
 
 B<Limitations:> attributes defined in roles are currently ignored by the
-Moos constructor; calling the C<DOES> method on Moos objects will generally
-work correctly for Role::Tiny and Moo::Role roles, but not Moose::Role.
+Moos constructor.
 
 =head2 Method Modifiers
 

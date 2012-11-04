@@ -25,5 +25,5 @@ is($obj->foo, 1);
 is($obj->bar, 42);
 
 ok(
-	Moose::Util::does_role('Local::Class', 'Local::Role'),
+	'Local::Class'->DOES('Local::Role'),
 );
