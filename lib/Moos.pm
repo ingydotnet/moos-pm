@@ -813,6 +813,10 @@ C<with> command that uses L<Role::Tiny> to do the work.)
         ...;
     }
 
+B<Limitations:> attributes defined in roles are currently ignored by the
+Moos constructor; calling the C<DOES> method on Moos objects will generally
+work correctly for Role::Tiny and Moo::Role roles, but not Moose::Role.
+
 =head2 Method Modifiers
 
 If you need method modifiers, then try L<Class::Method::Modifiers>.
