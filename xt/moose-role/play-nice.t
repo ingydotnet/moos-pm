@@ -15,9 +15,8 @@ BEGIN {
 	package Local::Class;
 	use Moos;
 	has 'bar';
+	with 'Local::Role';
 }
-
-Moose::Util::apply_all_roles('Local::Class', 'Local::Role');
 
 can_ok 'Local::Class', qw( new foo bar );
 my $obj = new_ok 'Local::Class', [ bar => 42 ];

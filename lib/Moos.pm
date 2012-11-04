@@ -92,7 +92,35 @@ sub extends {
 
 sub with {
     require Role::Tiny;
-    Role::Tiny->apply_roles_to_package(scalar(caller), @_);
+    my @roles = @_;
+    
+    # Load the role modules. (Role::Tiny would do this for us anyway.)
+    Role::Tiny::_load_module($_) for @roles;
+    
+    # If any of them were Moose roles, then Class::MOP will now be
+    # available to us. Use it to detect which roles have antlers.
+    if (my $class_of = 'Class::MOP'->can('class_of')) {
+        # Divide list of roles into Moose and non-Moose.
+        my (@moose, @nonmoose);
+        while (@roles) {
+            my $role = shift @roles;
+            my $list = $class_of->($role) ? \@moose : \@nonmoose;
+            push @$list, $role;
+            if (ref $roles[0] eq 'HASH') {
+                push @$list, shift @roles;
+            }
+        }
+        # Apply Moose roles
+        if (@moose and my $apply = 'Moose::Util'->can('apply_all_roles')) {
+            $apply->(scalar(caller), @moose);
+        }
+        # Allow non-Moose roles to fall through
+        @roles = @nonmoose;
+    }
+    
+    if (@roles) {
+        Role::Tiny->apply_roles_to_package(scalar(caller), @roles);
+    }
 }
 
 # Use this for exports and meta-exports
@@ -774,23 +802,14 @@ C<documentation>.
 
 =head2 Roles
 
-If you need roles, then Moos classes can consume L<Role::Tiny> and L<Moo::Role>
-roles. (Moos provides a C<with> command that uses L<Role::Tiny to do the work.)
+If you need roles, then Moos classes have B<experimental> support for
+L<Role::Tiny>, L<Moo::Role> and L<Moose::Role> roles. (Moos provides a
+C<with> command that uses L<Role::Tiny> to do the work.)
 
     {
         package Local::Class;
         use Moos;
         with "Local::Role";
-        ...;
-    }
-
-Moos classes can also consume L<Moose::Role> roles, though not as cleanly.
-
-    {
-        package Local::Class;
-        use Moos;
-        use Moose::Util;
-        Moose::Util::apply_all_roles(__PACKAGE__, "Local::Role");
         ...;
     }
 
