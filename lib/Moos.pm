@@ -32,7 +32,7 @@ sub import {
     # Turn on strict/warnings for caller
     strict->import;
     warnings->import;
-    
+
     ($_[1]||'') eq -Role and goto \&role_import;
 
     my ($class, %args) = @_;
