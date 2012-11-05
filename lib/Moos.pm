@@ -51,7 +51,7 @@ sub import {
     # Export the 'has', 'extends', and 'with' helper functions
     _export($package, has => \&has, $meta);
     _export($package, extends => \&extends, $meta);
-    _export($package, with => \&with);
+    _export($package, with => \&with, $meta);
 
     # Export the 'blessed' and 'confess' functions
     _export($package, blessed => \&Scalar::Util::blessed);
@@ -91,36 +91,8 @@ sub extends {
 }
 
 sub with {
-    require Role::Tiny;
-    my @roles = @_;
-    
-    # Load the role modules. (Role::Tiny would do this for us anyway.)
-    Role::Tiny::_load_module($_) for @roles;
-    
-    # If any of them were Moose roles, then Class::MOP will now be
-    # available to us. Use it to detect which roles have antlers.
-    if (my $class_of = 'Class::MOP'->can('class_of')) {
-        # Divide list of roles into Moose and non-Moose.
-        my (@moose, @nonmoose);
-        while (@roles) {
-            my $role = shift @roles;
-            my $list = $class_of->($role) ? \@moose : \@nonmoose;
-            push @$list, $role;
-            if (ref $roles[0] eq 'HASH') {
-                push @$list, shift @roles;
-            }
-        }
-        # Apply Moose roles
-        if (@moose and my $apply = 'Moose::Util'->can('apply_all_roles')) {
-            $apply->(scalar(caller), @moose);
-        }
-        # Allow non-Moose roles to fall through
-        @roles = @nonmoose;
-    }
-    
-    if (@roles) {
-        Role::Tiny->apply_roles_to_package(scalar(caller), @roles);
-    }
+    my ($meta, @roles) = @_;
+    $meta->apply_roles(@roles);
 }
 
 # Use this for exports and meta-exports
@@ -246,6 +218,42 @@ sub linearized_isa {
     my $self = shift;
     my %seen;
     return grep { not $seen{$_}++ } @{ mro::get_linear_isa($self->name) };
+}
+
+sub apply_roles
+{
+    my ($self, @roles) = @_;
+    my $package = $self->name;
+    
+    require Role::Tiny;
+    
+    # Load the role modules. (Role::Tiny would do this for us anyway.)
+    Role::Tiny::_load_module($_) for @roles;
+    
+    # If any of them were Moose roles, then Class::MOP will now be
+    # available to us. Use it to detect which roles have antlers.
+    if (my $class_of = 'Class::MOP'->can('class_of')) {
+        # Divide list of roles into Moose and non-Moose.
+        my (@moose, @nonmoose);
+        while (@roles) {
+            my $role = shift @roles;
+            my $list = $class_of->($role) ? \@moose : \@nonmoose;
+            push @$list, $role;
+            if (ref $roles[0] eq 'HASH') {
+                push @$list, shift @roles;
+            }
+        }
+        # Apply Moose roles
+        if (@moose and my $apply = 'Moose::Util'->can('apply_all_roles')) {
+            $apply->($package, @moose);
+        }
+        # Allow non-Moose roles to fall through
+        @roles = @nonmoose;
+    }
+    
+    if (@roles) {
+        'Role::Tiny'->apply_roles_to_package($package, @roles);
+    }
 }
 
 # This is where new objects are constructed. (Moose style)
