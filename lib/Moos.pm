@@ -253,6 +253,17 @@ sub apply_roles
     
     if (@roles) {
         'Role::Tiny'->apply_roles_to_package($package, @roles);
+        
+        foreach my $role (@roles) {
+            # Moo::Role stashes its attributes here...
+            my @attributes = @{ $Role::Tiny::INFO{$role}{attributes} || [] };
+            while (@attributes) {
+                my $name = shift @attributes;
+                my %args = %{ shift @attributes };
+                $args{_skip_setup} = 1;  # Moo::Role already made accessors
+                $self->add_attribute($name, \%args);
+            }
+        }
     }
 }
 
