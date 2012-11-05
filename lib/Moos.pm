@@ -25,16 +25,18 @@ our $CAN_HAZ_XS =
     eval{ require Class::XSAccessor; Class::XSAccessor->VERSION("1.07"); 1 };
 
 use constant default_metaclass => 'Moos::Meta::Class';
+use constant default_metarole  => 'Moos::Meta::Role';
 use constant default_base_class => 'Moos::Object';
 
 sub import {
-    my ($class, %args) = @_;
-    # Get name of the "class" from whence "use Moos;"
-    my $package = caller;
-
     # Turn on strict/warnings for caller
     strict->import;
     warnings->import;
+
+    ($_[1]||'') eq -Role and goto \&role_import;
+
+    my ($class, %args) = @_;
+    my $package = caller;
 
     # Create/register a metaclass object for the package
     my $metaclass =
@@ -59,6 +61,43 @@ sub import {
 
     # Possibly export some handy debugging stuff
     _export_xxx($package) if $ENV{PERL_MOOS_XXX};
+}
+
+sub role_import {
+    my ($class, undef, %args) = @_;
+    my $package = caller;
+
+    # Create/register a metaclass object for the package
+    my $metarole =
+        delete $args{metarole}
+        || $class->default_metarole;
+    my $meta = $metarole->initialize($package, %args);
+
+    # Using 'eval' rather that exporting ensures that this method
+    # will not be cleaned up by namespace::autoclean-type things.
+    eval q{
+        package }.$package.q{;
+        sub meta {
+            Moos::Meta::Role->initialize(
+                Scalar::Util::blessed($_[0]) || $_[0]
+            );
+        }
+    };
+
+    # Export the 'has' helper function
+    _export($package, has => \&has, $meta);
+
+    # Export the 'blessed' and 'confess' functions
+    _export($package, blessed => \&Scalar::Util::blessed);
+    _export($package, confess => \&Carp::confess);
+
+    # Possibly export some handy debugging stuff
+    _export_xxx($package) if $ENV{PERL_MOOS_XXX};
+
+    # Now do Role::Tiny's import stuff.
+    require Role::Tiny;
+    @_ = qw(Role::Tiny);
+    goto \&Role::Tiny::import; # preserve caller
 }
 
 # Attribute generator
@@ -277,7 +316,11 @@ sub apply_roles
     if (@roles) {
         'Role::Tiny'->apply_roles_to_package($package, @roles);
 
-        foreach my $role (@roles) {
+        my @more_roles = map {
+            keys %{ $Role::Tiny::APPLIED_TO{$_} }
+        } @roles;
+
+        foreach my $role (@more_roles) {
             # Moo::Role stashes its attributes here...
             my @attributes = @{ $Role::Tiny::INFO{$role}{attributes} || [] };
             while (@attributes) {
@@ -357,6 +400,22 @@ sub find_attribute_by_name {
         return $_ if $_->name eq $name;
     }
     return;
+}
+
+# Package for roles
+package Moos::Meta::Role;
+use Carp qw(confess);
+our @ISA = 'Moos::Meta::Class';
+
+sub add_attribute {
+    my $self = shift;
+    my $name = shift;
+    my %args = @_==1 ? %{$_[0]} : @_;
+
+    push @{$Role::Tiny::INFO{ $self->name }{attributes}},
+        $name => \%args;
+
+    $self->SUPER::add_attribute($name, \%args);
 }
 
 # Package for blessed attributes
