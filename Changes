@@ -1,4 +1,9 @@
 ---
+version: 0.11
+date:    Mon Nov  5 15:01:39 PST 2012
+changes:
+- Support Moos-Role.
+---
 version: 0.10
 date:    Sat Nov  3 16:18:00 PDT 2012
 changes:
