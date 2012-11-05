@@ -18,9 +18,9 @@ sub remoos {
     my $code = do {local $/; <$fh>};
     close $fh;
 
-    $code =~ s/^#.*\n//gm;
+    $code =~ s/^\ *#.*\n//gm;
     $code =~ s/^=\w.*//ms;
-    $code =~ s/Moos/$class_name/g;
+    $code =~ s/Moos\b/$class_name/g;
     $code =~ s/^(our \$VERSION =)/# $1/m;
 
     print $header . $code;
