@@ -248,10 +248,11 @@ sub apply_roles
             $apply->($package, @moose);
             
             foreach my $role (@moose) {
+                my $rolemeta = $class_of->($role);
                 my @attributes =
                     sort { $a->insertion_order <=> $b->insertion_order }
-                    map  { $role->meta->get_attribute($_) }
-                    $role->meta->get_attribute_list;
+                    map  { $rolemeta->get_attribute($_) }
+                    $rolemeta->get_attribute_list;
                 foreach my $attr ( @attributes ) {
                     my $name = $attr->name;
                     my %args = (
