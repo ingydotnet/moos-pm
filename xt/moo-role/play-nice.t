@@ -2,7 +2,7 @@ use Test::More;
 BEGIN {
 	eval q{ require Moo; Moo->VERSION("1.000000"); 1 }
 		or plan skip_all => "need Moo";
-	plan tests => 5;
+	plan tests => 6;
 };
 
 {
@@ -26,4 +26,8 @@ is($obj->bar, 42);
 
 ok(
 	Local::Class->does('Local::Role'),
+);
+
+ok(
+	Local::Class->DOES('Local::Role'),
 );
