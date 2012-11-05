@@ -246,6 +246,28 @@ sub apply_roles
         # Apply Moose roles
         if (@moose and my $apply = 'Moose::Util'->can('apply_all_roles')) {
             $apply->($package, @moose);
+            
+            foreach my $role (@moose) {
+                my @attributes =
+                    sort { $a->insertion_order <=> $b->insertion_order }
+                    map  { $role->meta->get_attribute($_) }
+                    $role->meta->get_attribute_list;
+                foreach my $attr ( @attributes ) {
+                    my $name = $attr->name;
+                    my %args = (
+                        lazy        => $attr->is_lazy,
+                        required    => $attr->is_required,
+                        is          => $attr->{is},
+                        _skip_setup => 1,
+                    );
+                    for my $arg (qw/ clearer predicate builder default documentation handles trigger /)
+                    {
+                        my $has = "has_$arg";
+                        $args{$arg} = $attr->$arg if $attr->$has;
+                    }
+                    $self->add_attribute($name, \%args);
+                }
+            }
         }
         # Allow non-Moose roles to fall through
         @roles = @nonmoose;
