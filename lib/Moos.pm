@@ -18,7 +18,7 @@ else {
     require MRO::Compat;
 }
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 our $CAN_HAZ_XS =
     !$ENV{PERL_MOOS_XS_DISABLE} &&
