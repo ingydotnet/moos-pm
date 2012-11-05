@@ -224,12 +224,12 @@ sub apply_roles
 {
     my ($self, @roles) = @_;
     my $package = $self->name;
-    
+
     require Role::Tiny;
-    
+
     # Load the role modules. (Role::Tiny would do this for us anyway.)
     Role::Tiny::_load_module($_) for @roles;
-    
+
     # If any of them were Moose roles, then Class::MOP will now be
     # available to us. Use it to detect which roles have antlers.
     if (my $class_of = 'Class::MOP'->can('class_of')) {
@@ -246,7 +246,7 @@ sub apply_roles
         # Apply Moose roles
         if (@moose and my $apply = 'Moose::Util'->can('apply_all_roles')) {
             $apply->($package, @moose);
-            
+
             foreach my $role (@moose) {
                 my @attributes =
                     sort { $a->insertion_order <=> $b->insertion_order }
@@ -272,10 +272,10 @@ sub apply_roles
         # Allow non-Moose roles to fall through
         @roles = @nonmoose;
     }
-    
+
     if (@roles) {
         'Role::Tiny'->apply_roles_to_package($package, @roles);
-        
+
         foreach my $role (@roles) {
             # Moo::Role stashes its attributes here...
             my @attributes = @{ $Role::Tiny::INFO{$role}{attributes} || [] };
