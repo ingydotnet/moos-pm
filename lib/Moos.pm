@@ -51,7 +51,7 @@ sub import {
     # Export the 'has', 'extends', and 'with' helper functions
     _export($package, has => \&has, $meta);
     _export($package, extends => \&extends, $meta);
-    _export($package, with => \&with);
+    _export($package, with => \&with, $meta);
 
     # Export the 'blessed' and 'confess' functions
     _export($package, blessed => \&Scalar::Util::blessed);
@@ -91,8 +91,8 @@ sub extends {
 }
 
 sub with {
-    require Role::Tiny;
-    Role::Tiny->apply_roles_to_package(scalar(caller), @_);
+    my ($meta, @roles) = @_;
+    $meta->apply_roles(@roles);
 }
 
 # Use this for exports and meta-exports
@@ -218,6 +218,75 @@ sub linearized_isa {
     my $self = shift;
     my %seen;
     return grep { not $seen{$_}++ } @{ mro::get_linear_isa($self->name) };
+}
+
+sub apply_roles
+{
+    my ($self, @roles) = @_;
+    my $package = $self->name;
+    
+    require Role::Tiny;
+    
+    # Load the role modules. (Role::Tiny would do this for us anyway.)
+    Role::Tiny::_load_module($_) for @roles;
+    
+    # If any of them were Moose roles, then Class::MOP will now be
+    # available to us. Use it to detect which roles have antlers.
+    if (my $class_of = 'Class::MOP'->can('class_of')) {
+        # Divide list of roles into Moose and non-Moose.
+        my (@moose, @nonmoose);
+        while (@roles) {
+            my $role = shift @roles;
+            my $list = $class_of->($role) ? \@moose : \@nonmoose;
+            push @$list, $role;
+            if (ref $roles[0] eq 'HASH') {
+                push @$list, shift @roles;
+            }
+        }
+        # Apply Moose roles
+        if (@moose and my $apply = 'Moose::Util'->can('apply_all_roles')) {
+            $apply->($package, @moose);
+            
+            foreach my $role (@moose) {
+                my @attributes =
+                    sort { $a->insertion_order <=> $b->insertion_order }
+                    map  { $role->meta->get_attribute($_) }
+                    $role->meta->get_attribute_list;
+                foreach my $attr ( @attributes ) {
+                    my $name = $attr->name;
+                    my %args = (
+                        lazy        => $attr->is_lazy,
+                        required    => $attr->is_required,
+                        is          => $attr->{is},
+                        _skip_setup => 1,
+                    );
+                    for my $arg (qw/ clearer predicate builder default documentation handles trigger /)
+                    {
+                        my $has = "has_$arg";
+                        $args{$arg} = $attr->$arg if $attr->$has;
+                    }
+                    $self->add_attribute($name, \%args);
+                }
+            }
+        }
+        # Allow non-Moose roles to fall through
+        @roles = @nonmoose;
+    }
+    
+    if (@roles) {
+        'Role::Tiny'->apply_roles_to_package($package, @roles);
+        
+        foreach my $role (@roles) {
+            # Moo::Role stashes its attributes here...
+            my @attributes = @{ $Role::Tiny::INFO{$role}{attributes} || [] };
+            while (@attributes) {
+                my $name = shift @attributes;
+                my %args = %{ shift @attributes };
+                $args{_skip_setup} = 1;  # Moo::Role already made accessors
+                $self->add_attribute($name, \%args);
+            }
+        }
+    }
 }
 
 # This is where new objects are constructed. (Moose style)
@@ -529,6 +598,23 @@ sub meta {
     Moos::Meta::Class->initialize(Scalar::Util::blessed($_[0]) || $_[0]);
 }
 
+sub does {
+    my ($self, $role) = @_;
+    return 1
+        if Role::Tiny::does_role($self, $role);
+    return 1
+        if UNIVERSAL::can('Moose::Util', 'can')
+        && Moose::Util->can('does_role')
+        && Moose::Util::does_role($self, $role);
+    return 0;
+}
+
+sub DOES {
+    my ($self, $role) = @_;
+    my $universal_does = UNIVERSAL->can('DOES') || UNIVERSAL->can('isa');
+    $self->does($role) or $self->$universal_does($role);
+}
+
 1;
 
 =encoding utf8
@@ -770,12 +856,20 @@ C<required>,
 C<lazy> and
 C<documentation>.
 
+=item does / DOES
+
+Methods to check whether the class/object performs a particular
+role. The methods differ in that C<does> checks roles only in
+the Moose/Moo/Role::Tiny sense; C<DOES> also takes into account
+L<UNIVERSAL>::DOES.
+
 =back
 
 =head2 Roles
 
-If you need roles, then Moos classes can consume L<Role::Tiny> and L<Moo::Role>
-roles. (Moos provides a C<with> command that uses L<Role::Tiny to do the work.)
+If you need roles, then Moos classes have B<experimental> support for
+L<Role::Tiny>, L<Moo::Role> and L<Moose::Role> roles. (Moos provides a
+C<with> command that uses L<Role::Tiny> to do the work.)
 
     {
         package Local::Class;
@@ -784,15 +878,11 @@ roles. (Moos provides a C<with> command that uses L<Role::Tiny to do the work.)
         ...;
     }
 
-Moos classes can also consume L<Moose::Role> roles, though not as cleanly.
-
-    {
-        package Local::Class;
-        use Moos;
-        use Moose::Util;
-        Moose::Util::apply_all_roles(__PACKAGE__, "Local::Role");
-        ...;
-    }
+B<Limitations:> Note that Moo and Moose each allow type constraints for
+attributes; Moos does not. This means that if you compose, say, a Moose::Role
+into a Moos class, you end up with a strange situation where the accessor
+methods will enforce type constraints (because they were generated by Moose)
+but the constructor will not (because it is inherited from Moos::Object).
 
 =head2 Method Modifiers
 
