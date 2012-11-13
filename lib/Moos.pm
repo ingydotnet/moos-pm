@@ -8,6 +8,8 @@ my $VALID_NAME = qr{ ^ [^\W0-9] \w* $ }ix;
 
 package Moos;
 
+our $VERSION = '0.13';
+
 use Scalar::Util;
 use Carp qw(confess);
 
@@ -17,8 +19,6 @@ if ($] >= 5.010) {
 else {
     require MRO::Compat;
 }
-
-our $VERSION = '0.12';
 
 our $CAN_HAZ_XS =
     !$ENV{PERL_MOOS_XS_DISABLE} &&
@@ -629,7 +629,8 @@ sub new {
 
 # A default BUILDARGS
 sub BUILDARGS {
-    return {@_[1..$#_]};
+    shift;
+    return +{(@_ and ref($_[0]) eq 'HASH') ? %{$_[0]} : @_};
 }
 
 # A default BUILDALL

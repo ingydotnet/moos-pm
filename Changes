@@ -1,4 +1,9 @@
 ---
+version: 0.13
+date:    Tue Nov 13 11:51:44 PST 2012
+changes:
+- Support hashref of arguments in object construction.
+---
 version: 0.12
 date:    Mon Nov 12 11:36:48 PST 2012
 changes:
