@@ -8,6 +8,8 @@ my $VALID_NAME = qr{ ^ [^\W0-9] \w* $ }ix;
 
 package Moos;
 
+our $VERSION = '0.13';
+
 use Scalar::Util;
 use Carp qw(confess);
 
@@ -17,8 +19,6 @@ if ($] >= 5.010) {
 else {
     require MRO::Compat;
 }
-
-our $VERSION = '0.11';
 
 our $CAN_HAZ_XS =
     !$ENV{PERL_MOOS_XS_DISABLE} &&
@@ -629,7 +629,8 @@ sub new {
 
 # A default BUILDARGS
 sub BUILDARGS {
-    return {@_[1..$#_]};
+    shift;
+    return +{(@_ and ref($_[0]) eq 'HASH') ? %{$_[0]} : @_};
 }
 
 # A default BUILDALL
@@ -974,7 +975,8 @@ keywords.
 =head1 Whence Moos
 
 I(ngy) created Moos during L<Pegex> development. Pegex uses a clone of Moos
-called L<Pegex::Base>.
+called L<Pegex::Base>. (L<Moos> ships with a commandline utility called
+C<remoos> that does this cloning.)
 
 Pegex is a parser framework and needs to be fast. While looking into speed
 issues I noted that accessor calling was the biggest hit. I tried all the
@@ -983,8 +985,8 @@ various Mo* solutions and L<Mouse> was the fastest.
 I was happy until I remembered that Mouse uses XS, and for various reasons
 this broke my toolchain (TestML, Module::Install, etc).
 
-I tried to inline L<Moo> into one file but failed, and ended up with this.
-I've shared Pegex::Base as L<Moos> in case any other projects want it.
+So I made a single module/file Moose clone and it worked out well. I've shared
+Pegex::Base as L<Moos> in case any other projects want it.
 
 Later on, Toby Inkster added a bunch of low-cost but very handy features from
 Moose.

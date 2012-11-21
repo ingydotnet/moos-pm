@@ -235,7 +235,8 @@ Features
 
 Whence Moos
     I(ngy) created Moos during Pegex development. Pegex uses a clone of Moos
-    called Pegex::Base.
+    called Pegex::Base. (Moos ships with a commandline utility called
+    "remoos" that does this cloning.)
 
     Pegex is a parser framework and needs to be fast. While looking into
     speed issues I noted that accessor calling was the biggest hit. I tried
@@ -244,8 +245,8 @@ Whence Moos
     I was happy until I remembered that Mouse uses XS, and for various
     reasons this broke my toolchain (TestML, Module::Install, etc).
 
-    I tried to inline Moo into one file but failed, and ended up with this.
-    I've shared Pegex::Base as Moos in case any other projects want it.
+    So I made a single module/file Moose clone and it worked out well. I've
+    shared Pegex::Base as Moos in case any other projects want it.
 
     Later on, Toby Inkster added a bunch of low-cost but very handy features
     from Moose.
