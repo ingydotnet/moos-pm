@@ -629,7 +629,12 @@ sub _setup_delegation {
             next if $method =~ $VALID_NAME;
             confess "invalid delegated method name '$method'";
         }
-        $metaclass->add_method($local, qq{ shift->{'$name'}->$remote(\@_) });
+        if ($self->_is_simple) {
+            $metaclass->add_method($local, qq{ shift->{$name}->$remote(\@_) });
+        }
+        else {
+            $metaclass->add_method($local, qq{ shift->$name\->$remote(\@_) });
+        }
     }
     return;
 }
@@ -916,6 +921,7 @@ of the following methods:
 C<name>,
 C<attribute_metaclass>,
 C<add_attribute>,
+C<add_method>,
 C<superclasses>,
 C<linearized_isa>,
 C<new_object>,
