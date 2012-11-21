@@ -224,6 +224,27 @@ sub add_attribute {
     );
 }
 
+{
+    my $has_subname = eval { require Sub::Name; 1 };
+    sub add_method {
+        my ($self, $name, $code) = @_;
+        my $pkg = $self->name;
+        if (ref $code) {
+            if ($has_subname) {
+                $code = Sub::Name::subname("$pkg\::$name", $code);
+                Moos::_export($pkg, $name, $code);
+            }
+            else {
+                # close over $code
+                eval "package $pkg; sub $name { goto \$code }";
+            }
+        }
+        else {
+            eval "package $pkg; sub $name { $code }";
+        }
+    }
+}
+
 # A tracing wrapper for debugging accessors
 our $TRACE_EXCLUDE = +{
     map {($_, 1)} (
@@ -511,9 +532,9 @@ sub _setup_accessor
         }
         else {
             my $accessor = $self->{is} eq 'ro'
-                ? eval qq{ sub { Carp::confess("cannot set value for read-only accessor '$name'") if \@_ > 1; \$_[0]{'$name'} } }
-                : eval qq{ sub { \$#_ ? \$_[0]{'$name'} = \$_[1] : \$_[0]{'$name'} } };
-            return Moos::_export($metaclass->{package}, $name, $accessor);
+                ? qq{ Carp::confess("cannot set value for read-only accessor '$name'") if \@_ > 1; \$_[0]{'$name'} }
+                : qq{ \$#_ ? \$_[0]{'$name'} = \$_[1] : \$_[0]{'$name'} };
+            return $metaclass->add_method($name, $accessor);
         }
     }
 
@@ -560,7 +581,7 @@ sub _setup_accessor
         if $ENV{PERL_MOOS_ACCESSOR_CALLS};
 
     # Export the accessor.
-    Moos::_export($metaclass->{package}, $name, $accessor);
+    $metaclass->add_method($name, $accessor);
 
     return;
 }
@@ -570,8 +591,7 @@ sub _setup_clearer {
     my $name = $self->{name};
 
     my $clearer = $self->{clearer} or return;
-    my $sub = eval qq{ sub { delete \$_[0]{'$name'} } };
-    Moos::_export($metaclass->{package}, $clearer, $sub);
+    $metaclass->add_method($clearer, qq{ delete \$_[0]{'$name'} });
     return;
 }
 
@@ -588,8 +608,7 @@ sub _setup_predicate {
         );
     }
 
-    my $sub = eval qq{ sub { exists \$_[0]{'$name'} } };
-    Moos::_export($metaclass->{package}, $predicate, $sub);
+    $metaclass->add_method($predicate, qq{ exists \$_[0]{'$name'} });
     return;
 }
 
@@ -610,8 +629,7 @@ sub _setup_delegation {
             next if $method =~ $VALID_NAME;
             confess "invalid delegated method name '$method'";
         }
-        my $sub = eval qq{ sub { shift->{'$name'}->$remote(\@_) } };
-        Moos::_export($metaclass->{package}, $local, $sub);
+        $metaclass->add_method($local, qq{ shift->{'$name'}->$remote(\@_) });
     }
     return;
 }
