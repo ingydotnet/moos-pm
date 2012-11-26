@@ -1,4 +1,12 @@
 ---
+version: 0.14
+date:    Mon Nov 26 08:40:02 PST 2012
+changes:
+- following patches from tobyink++
+- provide ->meta->add_method which does Sub::Name trickery
+- document and test Sub::Name-related stuff
+- fix delegation to lazy-built attributes
+---
 version: 0.13
 date:    Tue Nov 13 11:51:44 PST 2012
 changes:
