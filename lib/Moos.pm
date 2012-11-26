@@ -8,7 +8,7 @@ my $VALID_NAME = qr{ ^ [^\W0-9] \w* $ }ix;
 
 package Moos;
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 use Scalar::Util;
 use Carp qw(confess);
@@ -124,9 +124,11 @@ sub has {
 
 # Inheritance maker
 sub extends {
-    my ($meta, @parent) = @_;
-    eval "require $_" for @parent;
-    $meta->superclasses(@parent);
+    my ($meta, @parents) = @_;
+    for my $parent (@parents) {
+        eval "require $parent";
+    }
+    $meta->superclasses(@parents);
 }
 
 sub with {

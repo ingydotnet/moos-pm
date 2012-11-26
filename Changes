@@ -1,4 +1,9 @@
 ---
+version: 0.15
+date:    Mon Nov 26 09:00:46 PST 2012
+changes:
+- Fix https://rt.cpan.org/Ticket/Display.html?id=81314
+---
 version: 0.14
 date:    Mon Nov 26 08:40:02 PST 2012
 changes:
