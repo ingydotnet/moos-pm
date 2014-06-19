@@ -1,0 +1,31 @@
+=meta: 0.0.1
+
+name: Moos
+version: 0.16
+abstract: Moo s{imple,peedy,ingle}
+homepage: https://metacpan.org/release/Moos
+
+license: perl
+copyright: 2014. Ingy döt Net.
+author:
+  name: Ingy döt Net
+  email: ingy@cpan.org
+  github: ingydotnet
+  twitter: ingydotnet
+  freenode: ingy
+  homepage: http://ingy.net
+
+requires:
+  perl: 5.8.1
+  MRO::Compat: 0
+
+recommends:
+  Class::XSAccessor: 1.07
+  Role::Tiny: 1.002000
+
+devel:
+  git: git@github.org/ingydotnet/moos-pm
+  irc: irc.freenode.net/ingy
+  bug: https://github.com/ingydotnet/moos-pm/issues/
+
+=travis: perl
