@@ -6,7 +6,7 @@ my $VALID_NAME = qr{ ^ [^\W0-9] \w* $ }ix;
 
 package Moos;
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 use Scalar::Util;
 use Carp qw(confess);

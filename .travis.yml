@@ -14,6 +14,7 @@ install:
   Class::XSAccessor
   MRO::Compat
   Role::Tiny
+  Sub::Identify
 
 script:
 - PERL5OPT=-MDevel::Cover=-coverage,statement,branch,condition,path,subroutine

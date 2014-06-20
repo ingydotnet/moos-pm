@@ -1,4 +1,9 @@
 ---
+version: 0.17
+date:    Fri Jun 20 11:29:27 PDT 2014
+changes:
+- Fix test failures by prereqing Sub::Identify
+---
 version: 0.16
 date:    Thu Jun 19 12:04:24 PDT 2014
 changes:

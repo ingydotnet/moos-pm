@@ -13,7 +13,7 @@ BEGIN {
 {
 	package Local::Role1;
 	use Moos-Role;
-	
+
 	has attr1 => (is => 'ro', clearer => 1);
 	sub method1 { 1 };
 	around method3 => sub { 42 };
@@ -23,7 +23,7 @@ BEGIN {
 	package Local::Role2;
 	use Moos-Role;
 	with qw( Local::Role1 );
-	
+
 	has attr2 => (is => 'ro', clearer => 1);
 	sub method2 { 2 };
 	around method3 => sub { 43 };
@@ -33,7 +33,7 @@ BEGIN {
 	package Local::Class;
 	use Moos;
 	with qw( Local::Role2 );
-	
+
 	has attr3 => (is => 'ro', clearer => 1);
 	sub method2 { 22 };
 	sub method3 { 3 };
