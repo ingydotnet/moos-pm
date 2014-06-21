@@ -1,4 +1,9 @@
 ---
+version: 0.18
+date:    Sat Jun 21 13:48:09 PDT 2014
+changes:
+- Fix test failures with patch from tobyink++
+---
 version: 0.17
 date:    Fri Jun 20 11:29:27 PDT 2014
 changes:

@@ -6,7 +6,7 @@ my $VALID_NAME = qr{ ^ [^\W0-9] \w* $ }ix;
 
 package Moos;
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 
 use Scalar::Util;
 use Carp qw(confess);
@@ -685,9 +685,10 @@ sub meta {
 sub does {
     my ($self, $role) = @_;
     return 1
-        if Role::Tiny::does_role($self, $role);
+        if $INC{'Role/Tiny.pm'}
+        && Role::Tiny::does_role($self, $role);
     return 1
-        if UNIVERSAL::can('Moose::Util', 'can')
+        if $INC{'Moose/Util.pm'}
         && Moose::Util->can('does_role')
         && Moose::Util::does_role($self, $role);
     return 0;
