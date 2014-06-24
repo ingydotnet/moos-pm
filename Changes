@@ -1,4 +1,9 @@
 ---
+version: 0.19
+date:    Tue Jun 24 08:47:57 PDT 2014
+changes:
+- Add travis badge to doc
+---
 version: 0.18
 date:    Sat Jun 21 13:48:09 PDT 2014
 changes:

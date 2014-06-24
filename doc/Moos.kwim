@@ -3,6 +3,8 @@ Moos
 
 Moo s{imple,peedy,ingle}
 
+<badge travis coveralls ingydotnet/moos-pm>
+
 = Synopsis
 
   package Foos;

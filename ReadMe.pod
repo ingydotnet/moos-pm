@@ -10,6 +10,10 @@ See http://github.com/ingydotnet/kwim-pm#readme
 
 Moos - Moo s{imple,peedy,ingle}
 
+=for html
+<a href="https://travis-ci.org/ingydotnet/moos-pm"><img src="https://travis-ci.org/ingydotnet/moos-pm.png" alt="moos-pm"></a>
+<a href="https://coveralls.io/r/ingydotnet/moos-pm?branch=master"><img src="https://coveralls.io/repos/ingydotnet/moos-pm/badge.png" alt="moos-pm"></a>
+
 =head1 SYNOPSIS
 
     package Foos;
