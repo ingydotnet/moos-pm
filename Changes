@@ -1,4 +1,10 @@
 ---
+version: 0.20
+date:    Wed Jul 16 23:18:13 PDT 2014
+changes:
+- Rename docs to .swim
+- Fix Meta and add Contributing file
+---
 version: 0.19
 date:    Tue Jun 24 08:47:57 PDT 2014
 changes:
