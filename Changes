@@ -1,4 +1,9 @@
 ---
+version: 0.21
+date:    Wed Jul 30 15:54:19 PDT 2014
+changes:
+- Switch IRC to #pkg
+---
 version: 0.20
 date:    Wed Jul 16 23:18:13 PDT 2014
 changes:
@@ -84,7 +89,7 @@ version: 0.05
 date:    Thu Oct 25 12:44:58 PDT 2012
 changes:
 - Use Scalar::Util::blessed instead of ref
-- Support: has foo => 42;
+- Support `has foo => 42;`
 - Update docs.
 ---
 version: 0.04

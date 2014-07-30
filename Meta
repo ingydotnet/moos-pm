@@ -1,7 +1,7 @@
 =meta: 0.0.1
 
 name: Moos
-version: 0.20
+version: 0.21
 abstract: Moo s{imple,peedy,ingle}
 homepage: https://metacpan.org/release/Moos
 
@@ -27,6 +27,8 @@ recommends:
 devel:
   git: https://github.com/ingydotnet/moos-pm
   bug: https://github.com/ingydotnet/moos-pm/issues
-  irc: irc.freenode.net#ingy
+  irc: irc.freenode.net#pkg
 
-=travis: perl
+=travis:
+  type: perl
+  irc: irc.freenode.net#pkg
