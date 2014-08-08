@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 die "remoos expects a single argument: the class name to remoos as."
     unless @ARGV == 1;
