@@ -21,20 +21,20 @@ Simple roles for Moos.
 
 = Features
 
-== strict / warnings
+- strict / warnings
 
-Turns on `strict` and `warnings` for you.
+  Turns on `strict` and `warnings` for you.
 
-== Helpful exports
+- Helpful exports
 
-The ever useful `blessed` (from [Scalar::Util]) and `confess` (from [Carp]) are
-exported to your namespace.
+  The ever useful `blessed` (from [Scalar::Util]) and `confess` (from [Carp])
+  are exported to your namespace.
 
-== `has`
+- `has`
 
-Accessor generator. See [Moos].
+  Accessor generator. See [Moos].
 
-=head2 Development Options
+= Development Options
 
 - PERL_MOOS_XXX
 
