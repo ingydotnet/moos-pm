@@ -1,19 +1,25 @@
-=meta: 0.0.1
+=meta: 0.0.2
 
 name: Moos
-version: 0.27
+version: 0.28
 abstract: Moo s{imple,peedy,ingle}
 homepage: https://metacpan.org/release/Moos
-
+language: perl
 license: perl
-copyright: 2012-2014. Ingy döt Net.
+copyright: 2012-2014
+
 author:
   name: Ingy döt Net
   email: ingy@cpan.org
+  homepage: http://ingy.net
   github: ingydotnet
   twitter: ingydotnet
   freenode: ingy
-  homepage: http://ingy.net
+
+devel:
+  git: https://github.com/ingydotnet/moos-pm
+  bug: https://github.com/ingydotnet/moos-pm/issues
+  irc: irc.freenode.net#pkg
 
 requires:
   perl: 5.8.1
@@ -24,15 +30,5 @@ recommends:
   Role::Tiny: 1.002000
   Sub::Identify: 0.04
 
-test:
-  generate:
-    000-require-modules.t: true
-
-devel:
-  git: https://github.com/ingydotnet/moos-pm
-  bug: https://github.com/ingydotnet/moos-pm/issues
-  irc: irc.freenode.net#pkg
-
-=travis:
-  type: perl
-  irc: irc.freenode.net#pkg
+=zild:
+  test-000: require
