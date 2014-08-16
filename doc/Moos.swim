@@ -45,7 +45,7 @@ steer away from those features, you don't need those additional modules.
 Here's a quick list of the [Moose] compatible features that are supported by
 [Moos].
 
-== strict / warnings
+== strict/warnings
 
 Turns on `strict` and `warnings` for you.
 
@@ -235,7 +235,7 @@ PERL_MOOS_XS_DISABLE to true.
   `lazy` and
   `documentation`.
 
-- does / DOES
+- does/DOES
 
   Methods to check whether the class/object performs a particular role. The
   methods differ in that `does` checks roles only in the Moose/Moo/Role::Tiny

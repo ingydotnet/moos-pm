@@ -21,7 +21,7 @@ Simple roles for Moos.
 
 = Features
 
-- strict / warnings
+- strict/warnings
 
   Turns on `strict` and `warnings` for you.
 

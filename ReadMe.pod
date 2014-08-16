@@ -54,7 +54,7 @@ you steer away from those features, you don't need those additional modules.
 Here's a quick list of the L<Moose> compatible features that are supported
 by L<Moos>.
 
-=head2 strict / warnings
+=head2 strict/warnings
 
 Turns on C<strict> and C<warnings> for you.
 
@@ -234,7 +234,7 @@ functionality, including implementations of the following methods: C<name>,
 C<associated_class>, C<predicate>, C<clearer>, C<default>, C<builder>,
 C<trigger>, C<required>, C<lazy> and C<documentation>.
 
-=item does / DOES
+=item does/DOES
 
 Methods to check whether the classI<< object performs a particular role. The
 methods differ in that C<does> checks roles only in the Moose >>Moo/Role::Tiny
