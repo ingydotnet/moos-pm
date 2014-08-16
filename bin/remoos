@@ -26,6 +26,8 @@ sub remoos {
     print $header . $code;
 }
 
+=encoding utf8
+
 =head1 Name
 
 remoos - Rewrite Moos.pm into Your Own Module

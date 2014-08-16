@@ -1,4 +1,9 @@
 ---
+version: 0.27
+date:    Fri Aug 15 23:22:04 PDT 2014
+changes:
+- Add =encoding to bin/remoos
+---
 version: 0.26
 date:    Fri Aug 15 19:48:46 PDT 2014
 changes:
