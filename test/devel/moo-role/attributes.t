@@ -1,22 +1,22 @@
 use Test::More;
 BEGIN {
-	eval q{ require Moo; Moo->VERSION("1.000000"); 1 }
-		or plan skip_all => "need Moo";
-	plan tests => 10;
+    eval q{ require Moo; Moo->VERSION("1.000000"); 1 }
+        or plan skip_all => "need Moo";
+    plan tests => 10;
 };
 
 {
-	package Local::Role;
-	use Moo::Role;
-	has 'x' => (documentation => 'XXX', is => 'ro');
-	has 'y' => (documentation => 'YYY', is => 'ro');
+    package Local::Role;
+    use Moo::Role;
+    has 'x' => (documentation => 'XXX', is => 'ro');
+    has 'y' => (documentation => 'YYY', is => 'ro');
 }
 
 {
-	package Local::Class;
-	use Moos;
-	has 'z' => (documentation => 'ZZZ');
-	with qw( Local::Role );
+    package Local::Class;
+    use Moos;
+    has 'z' => (documentation => 'ZZZ');
+    with qw( Local::Role );
 }
 
 can_ok 'Local::Class', qw( new x y z );
@@ -27,11 +27,11 @@ is($obj->y, 222);
 is($obj->z, 333);
 
 ok(
-	Local::Class->does('Local::Role'),
+    Local::Class->does('Local::Role'),
 );
 
 ok(
-	Local::Class->DOES('Local::Role'),
+    Local::Class->DOES('Local::Role'),
 );
 
 is($obj->meta->get_attribute('x')->documentation, 'XXX');

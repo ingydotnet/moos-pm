@@ -2,13 +2,13 @@ use Test::More;
 
 my ($foo, $bar, $baz, $bat) = (0) x 4;
 {
-	package Foos;
-	use Moos;
-	has foo => ( trigger => sub { $foo++ } );
-	has bar => ( trigger => sub { $bar++ } );
-	has baz => ( trigger => sub { $baz++ }, default => sub { 42 } );
-	has bat => ( trigger => 1 );
-	sub _trigger_bat { $bat = $_[2] };
+    package Foos;
+    use Moos;
+    has foo => ( trigger => sub { $foo++ } );
+    has bar => ( trigger => sub { $bar++ } );
+    has baz => ( trigger => sub { $baz++ }, default => sub { 42 } );
+    has bat => ( trigger => 1 );
+    sub _trigger_bat { $bat = $_[2] };
 }
 
 

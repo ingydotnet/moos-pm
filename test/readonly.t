@@ -1,10 +1,10 @@
 use Test::More;
 
 {
-	package Foos;
-	use Moos;
-	has attr1 => (is => 'rw');
-	has attr2 => (is => 'ro');
+    package Foos;
+    use Moos;
+    has attr1 => (is => 'rw');
+    has attr2 => (is => 'ro');
 }
 
 my $obj = Foos->new(attr1 => 1, attr2 => 2);

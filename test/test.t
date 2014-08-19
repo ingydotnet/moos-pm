@@ -49,28 +49,28 @@ is ref($bar->{lol}), 'ARRAY';
 is $bar->{lol}[0], $Bar::array;
 
 ok eval q{{
-	package Fooble;
-	use Moos;
-	__PACKAGE__->can('confess') and __PACKAGE__->can('blessed');
-	blessed(Fooble->new);
+    package Fooble;
+    use Moos;
+    __PACKAGE__->can('confess') and __PACKAGE__->can('blessed');
+    blessed(Fooble->new);
 }};
 
 ok not eval q{{
-	package Boos1;
-	use Moos;
-	has 42;
+    package Boos1;
+    use Moos;
+    has 42;
 }};
 
 ok not eval q{{
-	package Boos2;
-	use Moos;
-	has boo => (handles => [42]);
+    package Boos2;
+    use Moos;
+    has boo => (handles => [42]);
 }};
 
 ok not eval q{{
-	package Boos3;
-	use Moos;
-	has boo => (predicate => '');
+    package Boos3;
+    use Moos;
+    has boo => (predicate => '');
 }};
 
 done_testing;

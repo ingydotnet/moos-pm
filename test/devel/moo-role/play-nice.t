@@ -1,21 +1,21 @@
 use Test::More;
 BEGIN {
-	eval q{ require Moo; Moo->VERSION("1.000000"); 1 }
-		or plan skip_all => "need Moo";
-	plan tests => 6;
+    eval q{ require Moo; Moo->VERSION("1.000000"); 1 }
+        or plan skip_all => "need Moo";
+    plan tests => 6;
 };
 
 {
-	package Local::Role;
-	use Moo::Role;
-	sub foo { 1 };
+    package Local::Role;
+    use Moo::Role;
+    sub foo { 1 };
 }
 
 {
-	package Local::Class;
-	use Moos;
-	has 'bar';
-	with qw( Local::Role );
+    package Local::Class;
+    use Moos;
+    has 'bar';
+    with qw( Local::Role );
 }
 
 can_ok 'Local::Class', qw( new foo bar );
@@ -25,9 +25,9 @@ is($obj->foo, 1);
 is($obj->bar, 42);
 
 ok(
-	Local::Class->does('Local::Role'),
+    Local::Class->does('Local::Role'),
 );
 
 ok(
-	Local::Class->DOES('Local::Role'),
+    Local::Class->DOES('Local::Role'),
 );

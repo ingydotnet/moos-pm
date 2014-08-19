@@ -1,15 +1,15 @@
 use Test::More;
 
 {
-	package Foos;
-	use Moos;
-	has 'bar';
+    package Foos;
+    use Moos;
+    has 'bar';
 }
 
 {
-	package Boos;
-	use Moos;
-	has foo => (handles => [qw/bar/]);
+    package Boos;
+    use Moos;
+    has foo => (handles => [qw/bar/]);
 }
 
 my $B = Boos->new(foo => Foos->new);

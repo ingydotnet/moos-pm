@@ -1,9 +1,9 @@
 use Test::More;
 
 {
-	package Foos;
-	use Moos;
-	has attr => (clearer => 1, predicate => 1);
+    package Foos;
+    use Moos;
+    has attr => (clearer => 1, predicate => 1);
 }
 
 my $obj = Foos->new(attr => 42);
